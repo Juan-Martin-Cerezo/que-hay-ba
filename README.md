@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Qué Hay BA — Mapa Interactivo de Actividades y Eventos en CABA
 
-## Getting Started
+Plataforma web interactiva en tiempo real que reúne la agenda cultural, teatral, musical, gastronómica y recreativa de la Ciudad Autónoma de Buenos Aires (CABA).
 
-First, run the development server:
+## Características principales
+
+- **Mapa interactivo (MapLibre GL + OpenFreeMap):** agrupación inteligente (*clusters*) por concentración barrial y pines codificados por color según la categoría.
+- **Datos reales multi-fuente:**
+  - **Agenda Cultural GCBA (`linda.buenosaires.gob.ar`):** museos, centros culturales, visitas guiadas, festivales y actividades gratuitas.
+  - **Alternativa Teatral:** cartelera escénica de CABA con horarios, salas, precios y sinopsis.
+  - **Eventbrite CABA:** talleres, conferencias, recitales, ferias y eventos comunitarios con precios reales en ARS.
+- **Deduplicación y geocodificación:** normalización automática de salas y direcciones mediante caché local de 62 espacios culturales emblemáticos, el normalizador oficial **USIG GCBA** (`srid=4326`) y Nominatim acotado al polígono de CABA.
+- **Filtros combinables:**
+  - **Tiempo:** `🟢 En vivo ahora`, `📅 Hoy`, `🗓️ Este finde` y selector de fecha específica (`📆`).
+  - **Presupuesto:** `🎟️ Gratis`, `Hasta $10.000`, `$10.000 – $30.000`, `Más de $30.000`.
+  - **Categorías:** Música, Teatro y Espectáculos, Arte y Cultura, Gastronomía y Ferias, Aire Libre y Deportes, Talleres y Charlas.
+- **Ficha completa del evento:** imagen, descripción, próximas funciones, botón **Cómo llegar** (Google Maps) y enlace directo a la **Web oficial / Entradas**.
+- **Favoritos y geolocalización:** guardado persistente en `localStorage` (`❤️ Favoritos`) y ordenamiento por cercanía (`📍 Mi ubicación`).
+
+## Comandos
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# Ejecutar migración SQL, sembrar las 62 sedes de CABA e ingerir las 3 fuentes reales
+npm run db:setup
+
+# Actualizar eventos desde todas las fuentes (o una específica: --source=gcba|eventbrite|alternativa)
+npm run ingest
+
+# Ejecutar tests unitarios, chequeo de tipos, linter y build de producción
+npm test
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de entorno (`.env.local` / Vercel)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```env
+DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-sa-east-1.pooler.supabase.com:6543/postgres
+CRON_SECRET=tu-secreto-para-vercel-cron
+```
