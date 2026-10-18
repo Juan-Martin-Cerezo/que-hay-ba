@@ -156,14 +156,14 @@ export function ExploreClient() {
   );
 
   const cycleMapTheme = () => {
-    const order: MapThemeId[] = ["voyager", "dark", "light", "osm"];
+    const order: MapThemeId[] = ["voyager", "osm", "dark", "light"];
     const next = order[(order.indexOf(mapTheme) + 1) % order.length];
     setMapTheme(next);
   };
 
   return (
-    <main className="relative h-dvh w-screen overflow-hidden bg-slate-200 select-none dark:bg-slate-950">
-      {/* Interactive Full-Viewport Map */}
+    <main className="relative h-dvh w-screen overflow-hidden bg-[#f6f3ec] select-none dark:bg-[#080b12]">
+      {/* Interactive Full-Viewport Map with Custom Category Icon Pins */}
       <MapView
         data={data}
         selectedId={selected?.id ?? null}
@@ -174,7 +174,7 @@ export function ExploreClient() {
         onSelectEvent={handleSelectEvent}
       />
 
-      {/* Top Floating Search & Filter Command Bar */}
+      {/* Top Editorial Command Bar */}
       <FilterBar
         filters={filters}
         total={data.total}
@@ -191,14 +191,14 @@ export function ExploreClient() {
         onLocateUser={handleLocateUser}
       />
 
-      {/* Collapsible Discovery Sidebar (Desktop Left Panel / Mobile Bottom Sheet) */}
+      {/* Collapsible Editorial Cartelera Sidebar (Desktop Left Panel / Mobile Bottom Sheet) */}
       {listOpen && (
         <section
-          aria-label="Listado de actividades"
-          className="fixed bottom-16 left-2.5 right-2.5 z-20 flex max-h-[58dvh] flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-xl sm:bottom-16 sm:left-3.5 sm:right-auto sm:top-28 sm:max-h-none sm:w-[370px] dark:border-slate-800/90 dark:bg-slate-900/95"
+          aria-label="Cartelera de experiencias"
+          className="fixed bottom-16 left-2.5 right-2.5 z-20 flex max-h-[58dvh] flex-col overflow-hidden rounded-3xl border border-slate-900/14 bg-[#fcfaf5]/96 shadow-2xl backdrop-blur-xl sm:bottom-16 sm:left-3.5 sm:right-auto sm:top-29 sm:max-h-none sm:w-[385px] dark:border-white/14 dark:bg-[#0b0f19]/96"
         >
           {/* Quick Barrio Jump Strip inside panel */}
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200/70 bg-slate-50/70 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800/80 dark:bg-slate-800/40">
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-900/10 bg-slate-900/[0.03] px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-white/[0.03]">
             {CABA_ZONES.map((z) => {
               const active = activeZone === z.id;
               return (
@@ -208,8 +208,8 @@ export function ExploreClient() {
                   onClick={() => handleSelectZone(z)}
                   className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
                     active
-                      ? "bg-sky-600 text-white shadow-xs"
-                      : "bg-white/90 text-slate-600 hover:bg-white hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300"
+                      ? "bg-slate-950 text-white shadow-xs dark:bg-rose-600"
+                      : "bg-white/90 text-slate-700 hover:bg-white hover:text-slate-950 dark:bg-slate-800/80 dark:text-slate-300"
                   }`}
                 >
                   {z.label}
@@ -219,15 +219,15 @@ export function ExploreClient() {
           </div>
 
           {/* Panel Header + Sort Tabs */}
-          <div className="flex items-center justify-between border-b border-slate-200/80 px-3.5 py-2 dark:border-slate-800">
+          <div className="flex items-center justify-between border-b border-slate-900/10 px-3.5 py-2.5 dark:border-white/10">
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={() => setSortMode("upcoming")}
-                className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
                   sortMode === "upcoming"
-                    ? "bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950"
-                    : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    ? "bg-slate-950 text-white dark:bg-amber-400 dark:text-slate-950"
+                    : "text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800"
                 }`}
               >
                 Próximos
@@ -235,22 +235,22 @@ export function ExploreClient() {
               <button
                 type="button"
                 onClick={() => setSortMode("free")}
-                className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
                   sortMode === "free"
                     ? "bg-emerald-600 text-white"
-                    : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    : "text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800"
                 }`}
               >
-                Gratis primero
+                $0 Gratis primero
               </button>
               {userLocation && (
                 <button
                   type="button"
                   onClick={() => setSortMode("nearest")}
-                  className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
                     sortMode === "nearest"
-                      ? "bg-sky-600 text-white"
-                      : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                      ? "bg-rose-600 text-white"
+                      : "text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800"
                   }`}
                 >
                   Cerca mío
@@ -261,29 +261,29 @@ export function ExploreClient() {
             <button
               type="button"
               onClick={() => setListOpen(false)}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-              aria-label="Cerrar listado"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-slate-400 hover:bg-slate-200/70 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-white"
+              aria-label="Cerrar cartelera"
             >
               ✕
             </button>
           </div>
 
-          {/* Scrollable Event Cards */}
-          <div className="flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800/70">
+          {/* Scrollable Editorial Ticket Cards */}
+          <div className="flex-1 divide-y divide-dashed divide-slate-900/12 overflow-y-auto dark:divide-white/12">
             {sortedEvents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
-                <span className="text-2xl">🔍</span>
-                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  No encontramos actividades con esos filtros
+              <div className="flex flex-col items-center justify-center gap-2.5 p-8 text-center">
+                <span className="text-3xl">🎭</span>
+                <p className="font-display text-sm font-bold text-slate-800 dark:text-slate-100">
+                  Sin funciones para este filtro
                 </p>
                 <button
                   type="button"
                   onClick={() =>
                     setFilters({ q: "", when: "", price: "", categories: [] })
                   }
-                  className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500"
+                  className="rounded-xl bg-slate-950 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-rose-600"
                 >
-                  Ver todas las actividades
+                  Restablecer cartelera
                 </button>
               </div>
             ) : (
@@ -301,38 +301,47 @@ export function ExploreClient() {
                     onMouseEnter={() => setHoveredId(ev.id)}
                     onMouseLeave={() => setHoveredId(null)}
                     onClick={() => handleSelectEvent(ev)}
-                    className={`group flex w-full items-start gap-3 p-3 text-left transition ${
+                    className={`group flex w-full items-start gap-3 p-3.5 text-left transition ${
                       isSelected
-                        ? "bg-sky-50/90 dark:bg-sky-950/50"
-                        : "hover:bg-slate-50/90 dark:hover:bg-slate-800/50"
+                        ? "bg-amber-500/12 dark:bg-rose-500/15"
+                        : "hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04]"
                     }`}
                   >
-                    <div
-                      className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-sm text-white shadow-sm transition group-hover:scale-105"
-                      style={{ backgroundColor: cat.color }}
-                    >
-                      {cat.emoji}
+                    {/* Pin-matching Category Icon Medallion */}
+                    <div className="relative mt-0.5 shrink-0">
+                      <div
+                        className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-white text-base text-white shadow-md transition group-hover:scale-105 dark:border-slate-800"
+                        style={{ backgroundColor: cat.color }}
+                      >
+                        {cat.emoji}
+                      </div>
+                      {ev.isFree && (
+                        <span className="font-mono-tabular absolute -right-1.5 -top-1.5 rounded-full border border-white bg-emerald-500 px-1 text-[8px] font-black text-white shadow-xs">
+                          $0
+                        </span>
+                      )}
                     </div>
+
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                        <span className="truncate capitalize">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono-tabular truncate text-[11px] font-semibold uppercase tracking-tight text-slate-500 dark:text-slate-400">
                           {formatEventDate(ev.startsAt)}
                         </span>
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.2 text-[10px] font-extrabold ${
+                          className={`font-mono-tabular shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
                             ev.isFree
                               ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                              : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
+                              : "bg-slate-900/8 text-slate-800 dark:bg-white/10 dark:text-slate-200"
                           }`}
                         >
                           {ev.priceLabel}
                         </span>
                       </div>
-                      <div className="mt-0.5 line-clamp-1 text-xs font-extrabold text-slate-900 group-hover:text-sky-600 dark:text-white dark:group-hover:text-sky-400">
+                      <div className="font-display mt-0.5 line-clamp-1 text-[13.5px] font-bold leading-snug text-slate-950 group-hover:text-rose-600 dark:text-white dark:group-hover:text-amber-300">
                         {ev.title}
                       </div>
-                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
-                        {ev.venueName}
+                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">
+                        📍 {ev.venueName}
                         {ev.barrio ? ` · ${ev.barrio}` : ""}
                         {dist != null ? ` · ${dist.toFixed(1)} km` : ""}
                       </div>
@@ -345,15 +354,15 @@ export function ExploreClient() {
         </section>
       )}
 
-      {/* Bottom Floating Control Dock */}
+      {/* Bottom Floating Cartographic Control Dock */}
       <div className="pointer-events-none absolute bottom-3.5 left-2.5 right-14 z-20 flex flex-wrap items-center gap-2 sm:left-3.5">
         <button
           type="button"
           onClick={() => setListOpen((v) => !v)}
-          className="pointer-events-auto flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-4 py-2 text-xs font-extrabold text-slate-900 shadow-xl backdrop-blur-xl transition hover:scale-[1.02] hover:bg-white dark:border-slate-700 dark:bg-slate-900/95 dark:text-white"
+          className="pointer-events-auto flex items-center gap-2 rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-xl backdrop-blur-xl transition hover:scale-[1.02] hover:bg-white dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-white"
         >
-          <span>{listOpen ? "🗺️ Ocultar lista" : "📋 Explorar lista"}</span>
-          <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-extrabold text-white">
+          <span>{listOpen ? "🗺️ Ocultar cartelera" : "🎟️ Cartelera lateral"}</span>
+          <span className="font-mono-tabular rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-extrabold text-white dark:bg-rose-600">
             {data.total}
           </span>
         </button>
@@ -362,18 +371,18 @@ export function ExploreClient() {
         <button
           type="button"
           onClick={cycleMapTheme}
-          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur-xl transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200"
-          title="Cambiar estilo visual del mapa"
+          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-3.5 py-2 text-xs font-bold text-slate-800 shadow-xl backdrop-blur-xl transition hover:bg-white dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-slate-200"
+          title="Cambiar capa cartográfica"
         >
-          <span>🎨</span>
+          <span>🗺️</span>
           <span>
             {mapTheme === "voyager"
-              ? "Mapa: Color"
-              : mapTheme === "dark"
-                ? "Mapa: Nocturno"
-                : mapTheme === "light"
-                  ? "Mapa: Claro"
-                  : "Mapa: Callejero"}
+              ? "Capa: Urbano CABA"
+              : mapTheme === "osm"
+                ? "Capa: GCBA + Subte"
+                : mapTheme === "dark"
+                  ? "Capa: Nocturno"
+                  : "Capa: Callejero"}
           </span>
         </button>
 
@@ -381,18 +390,18 @@ export function ExploreClient() {
         <button
           type="button"
           onClick={() => handleSelectZone(CABA_ZONES[0])}
-          className="pointer-events-auto hidden items-center gap-1 rounded-full border border-slate-200/90 bg-white/95 px-3 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur-xl transition hover:bg-white sm:flex dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200"
-          title="Ver toda la Ciudad de Buenos Aires"
+          className="pointer-events-auto hidden items-center gap-1 rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-3 py-2 text-xs font-bold text-slate-800 shadow-xl backdrop-blur-xl transition hover:bg-white sm:flex dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-slate-200"
+          title="Centrar vista en toda la Ciudad de Buenos Aires"
         >
           <span>🎯</span>
-          <span>Toda CABA</span>
+          <span>Vista CABA</span>
         </button>
 
         <Link
           href="/acerca"
-          className="pointer-events-auto rounded-full border border-slate-200/90 bg-white/95 px-3 py-2 text-xs font-bold text-slate-600 shadow-xl backdrop-blur-xl transition hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300"
+          className="pointer-events-auto rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-3 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur-xl transition hover:text-slate-950 dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-slate-300"
         >
-          Fuentes
+          Proyecto y Fuentes
         </Link>
       </div>
 

@@ -69,44 +69,49 @@ export function FilterBar({
 
   return (
     <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex flex-col gap-2 p-2.5 sm:p-3.5">
-      {/* Top Floating Command Bar */}
-      <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/92 p-2 shadow-xl shadow-slate-900/10 backdrop-blur-xl dark:border-slate-800/90 dark:bg-slate-900/92">
-        {/* Brand Identity */}
+      {/* Top Editorial Command Bar */}
+      <div className="pointer-events-auto flex flex-wrap items-center gap-2.5 rounded-2xl border border-slate-900/12 bg-[#fcfaf5]/95 p-2 shadow-2xl shadow-slate-950/15 backdrop-blur-xl dark:border-white/12 dark:bg-[#0b0f19]/95">
+        {/* Porteño Editorial Masthead */}
         <div className="flex items-center gap-2.5 pl-1.5 pr-1">
-          <div className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 via-blue-600 to-indigo-700 text-xs font-extrabold tracking-tight text-white shadow-md shadow-blue-600/25">
-            BA
-            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500 dark:border-slate-900" />
+          <div className="relative flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-xl border border-white/20 bg-slate-950 text-white shadow-md dark:bg-rose-600">
+            <span className="font-display text-xs font-extrabold leading-none tracking-tight">
+              BA
+            </span>
+            <span className="font-mono-tabular mt-0.5 text-[8px] font-bold uppercase tracking-widest text-amber-300 dark:text-white/90">
+              VIVO
+            </span>
+            <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#fcfaf5] bg-emerald-500 dark:border-[#0b0f19]" />
           </div>
           <div className="leading-tight">
-            <div className="flex items-center gap-1.5">
-              <h1 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-white">
+            <div className="flex items-center gap-2">
+              <h1 className="font-display text-base font-extrabold tracking-tight text-slate-950 sm:text-lg dark:text-white">
                 Qué Hay BA
               </h1>
-              <span className="hidden rounded-full bg-sky-500/10 px-2 py-0.5 text-[10px] font-bold text-sky-700 sm:inline-block dark:bg-sky-400/15 dark:text-sky-300">
-                CABA En Vivo
+              <span className="font-mono-tabular hidden rounded-md border border-slate-900/15 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-900 sm:inline-block dark:border-amber-400/25 dark:bg-amber-400/15 dark:text-amber-300">
+                34°36′S · CABA
               </span>
             </div>
-            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+            <p className="font-mono-tabular text-[11px] font-semibold text-slate-600 dark:text-slate-400">
               {loading ? (
-                <span className="inline-flex items-center gap-1 text-sky-600 dark:text-sky-400">
-                  <span className="h-1.5 w-1.5 animate-ping rounded-full bg-sky-500" />
-                  Actualizando mapa…
+                <span className="inline-flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                  <span className="h-1.5 w-1.5 animate-ping rounded-full bg-rose-500" />
+                  Sincronizando cartelera…
                 </span>
               ) : (
-                `${total.toLocaleString("es-AR")} planes activos`
+                `${total.toLocaleString("es-AR")} experiencias geolocalizadas`
               )}
             </p>
           </div>
         </div>
 
         {/* Search Input */}
-        <div className="relative min-w-[160px] flex-1">
+        <div className="relative min-w-[165px] flex-1">
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.2"
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
           >
             <circle cx="11" cy="11" r="8" />
@@ -116,15 +121,15 @@ export function FilterBar({
             type="search"
             value={filters.q}
             onChange={(e) => onChange({ ...filters, q: e.target.value })}
-            placeholder="Buscar obra, recital, teatro, museo, barrio…"
+            placeholder="Buscar obra, recital, centro cultural, museo, barrio…"
             aria-label="Buscar actividades en CABA"
-            className="w-full rounded-xl border border-slate-200/90 bg-slate-100/80 py-2 pl-9 pr-8 text-xs font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-sky-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/20 sm:text-sm dark:border-slate-700/80 dark:bg-slate-800/80 dark:text-white dark:focus:border-sky-400 dark:focus:bg-slate-800"
+            className="w-full rounded-xl border border-slate-900/12 bg-white/90 py-2 pl-9 pr-8 text-xs font-semibold text-slate-900 placeholder:text-slate-400 transition focus:border-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10 sm:text-sm dark:border-white/12 dark:bg-slate-900/90 dark:text-white dark:focus:border-rose-500"
           />
           {filters.q && (
             <button
               type="button"
               onClick={() => onChange({ ...filters, q: "" })}
-              className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200/80 text-[10px] font-bold text-slate-600 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-300"
+              className="absolute right-2.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 hover:bg-slate-300 dark:bg-slate-700 dark:text-slate-200"
               aria-label="Limpiar búsqueda"
             >
               ✕
@@ -136,12 +141,12 @@ export function FilterBar({
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
             moreOpen || filters.price || customDate || activeZone !== "all"
-              ? "border-indigo-500/40 bg-indigo-50 text-indigo-700 dark:border-indigo-400/40 dark:bg-indigo-950/60 dark:text-indigo-300"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              ? "border-slate-900 bg-slate-900 text-white dark:border-rose-500 dark:bg-rose-600"
+              : "border-slate-900/12 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/12 dark:bg-slate-800/90 dark:text-slate-100"
           }`}
-          title="Barrios, precios y estilo de mapa"
+          title="Barrios, precios y capas del mapa"
         >
           <svg
             aria-hidden="true"
@@ -153,8 +158,8 @@ export function FilterBar({
           >
             <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />
           </svg>
-          <span className="hidden md:inline">Barrios y Mapa</span>
-          <span className="md:hidden">Opciones</span>
+          <span className="hidden md:inline">Barrios y Capas</span>
+          <span className="md:hidden">Filtros</span>
         </button>
 
         {/* Near Me GPS Button */}
@@ -162,10 +167,10 @@ export function FilterBar({
           type="button"
           onClick={onLocateUser}
           disabled={locating}
-          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition ${
+          className={`flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-bold transition ${
             hasUserLocation
-              ? "border-sky-500 bg-sky-500 text-white shadow-sm shadow-sky-500/30"
-              : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+              ? "border-emerald-600 bg-emerald-600 text-white shadow-sm shadow-emerald-600/30"
+              : "border-slate-900/12 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/12 dark:bg-slate-800/90 dark:text-slate-100"
           }`}
           title="Centrar en mi ubicación actual"
         >
@@ -174,7 +179,7 @@ export function FilterBar({
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="2.2"
             className={`h-3.5 w-3.5 ${locating ? "animate-spin" : ""}`}
           >
             <circle cx="12" cy="12" r="3" />
@@ -189,29 +194,29 @@ export function FilterBar({
         <button
           type="button"
           onClick={onOpenFavorites}
-          className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-          title="Ver planes guardados"
+          className="flex items-center gap-1.5 rounded-xl border border-slate-900/12 bg-white px-3 py-2 text-xs font-bold text-slate-800 transition hover:bg-slate-100 dark:border-white/12 dark:bg-slate-800/90 dark:text-slate-100"
+          title="Ver agenda guardada"
         >
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
             fill={favoritesCount > 0 ? "#e11d48" : "none"}
             stroke={favoritesCount > 0 ? "#e11d48" : "currentColor"}
-            strokeWidth="2"
+            strokeWidth="2.2"
             className="h-3.5 w-3.5"
           >
             <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
           </svg>
-          <span className="hidden sm:inline">Guardados</span>
+          <span className="hidden sm:inline">Mi Agenda</span>
           {favoritesCount > 0 && (
-            <span className="rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
+            <span className="font-mono-tabular rounded-full bg-rose-600 px-1.5 py-0.2 text-[10px] font-bold text-white">
               {favoritesCount}
             </span>
           )}
         </button>
       </div>
 
-      {/* Row 2: Unified Quick-Filter Rail (Time + Gratis + Categories) */}
+      {/* Row 2: Interactive Icon Legend + Quick-Filter Rail */}
       <div className="pointer-events-auto flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {WHEN_FILTERS.map((w) => {
           const active = filters.when === w.id;
@@ -220,10 +225,10 @@ export function FilterBar({
               key={w.id}
               type="button"
               onClick={() => onChange({ ...filters, when: active ? "" : w.id })}
-              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md transition ${
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-bold shadow-md backdrop-blur-md transition ${
                 active
-                  ? "border-slate-900 bg-slate-900 text-white dark:border-sky-400 dark:bg-sky-500 dark:text-slate-950"
-                  : "border-slate-200/90 bg-white/92 text-slate-700 hover:bg-white dark:border-slate-700/90 dark:bg-slate-900/90 dark:text-slate-200"
+                  ? "border-slate-950 bg-slate-950 text-white dark:border-amber-400 dark:bg-amber-400 dark:text-slate-950"
+                  : "border-slate-900/12 bg-[#fcfaf5]/95 text-slate-800 hover:bg-white dark:border-white/12 dark:bg-[#0b0f19]/92 dark:text-slate-200"
               }`}
             >
               {w.emoji} {w.label}
@@ -231,24 +236,27 @@ export function FilterBar({
           );
         })}
 
-        {/* One-tap Gratis toggle */}
+        {/* One-tap Gratis toggle matching the "$0" map pin badge */}
         <button
           type="button"
           onClick={() =>
             onChange({ ...filters, price: filters.price === "free" ? "" : "free" })
           }
-          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md transition ${
+          className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-extrabold shadow-md backdrop-blur-md transition ${
             filters.price === "free"
-              ? "border-emerald-600 bg-emerald-600 text-white shadow-emerald-600/25"
-              : "border-slate-200/90 bg-white/92 text-slate-700 hover:bg-white dark:border-slate-700/90 dark:bg-slate-900/90 dark:text-slate-200"
+              ? "border-emerald-600 bg-emerald-600 text-white shadow-emerald-600/30"
+              : "border-slate-900/12 bg-[#fcfaf5]/95 text-slate-800 hover:bg-white dark:border-white/12 dark:bg-[#0b0f19]/92 dark:text-slate-200"
           }`}
         >
-          🎟️ Gratis
+          <span className="font-mono-tabular rounded-full bg-emerald-500 px-1.5 py-0.2 text-[10px] font-black text-white">
+            $0
+          </span>
+          <span>Gratis</span>
         </button>
 
-        <span className="mx-0.5 h-4 w-px shrink-0 bg-slate-300/80 dark:bg-slate-700" />
+        <span className="mx-0.5 h-4 w-px shrink-0 bg-slate-400/50 dark:bg-slate-700" />
 
-        {/* Category Pills */}
+        {/* Map Icon Legend Category Pills */}
         {CATEGORIES.map((c) => {
           const active = filters.categories.includes(c.id);
           return (
@@ -261,17 +269,18 @@ export function FilterBar({
                   ? { backgroundColor: c.color, borderColor: c.color, color: "#ffffff" }
                   : undefined
               }
-              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm backdrop-blur-md transition ${
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold shadow-md backdrop-blur-md transition hover:scale-[1.02] ${
                 active
-                  ? "text-white shadow-md"
-                  : "border-slate-200/90 bg-white/92 text-slate-700 hover:bg-white dark:border-slate-700/90 dark:bg-slate-900/90 dark:text-slate-200"
+                  ? "text-white ring-2 ring-white/50"
+                  : "border-slate-900/12 bg-[#fcfaf5]/95 text-slate-800 hover:bg-white dark:border-white/12 dark:bg-[#0b0f19]/92 dark:text-slate-200"
               }`}
             >
               <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: active ? "#ffffff" : c.color }}
-              />
-              <span>{c.emoji}</span>
+                className="flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white shadow-xs"
+                style={{ backgroundColor: active ? "rgba(0,0,0,0.22)" : c.color }}
+              >
+                {c.emoji}
+              </span>
               <span className="hidden sm:inline">{c.label}</span>
               <span className="sm:hidden">{c.shortLabel}</span>
             </button>
@@ -282,7 +291,7 @@ export function FilterBar({
           <button
             type="button"
             onClick={() => onChange({ q: "", when: "", price: "", categories: [] })}
-            className="shrink-0 rounded-full border border-rose-300 bg-rose-50/95 px-3 py-1.5 text-xs font-bold text-rose-700 shadow-sm hover:bg-rose-100 dark:border-rose-800 dark:bg-rose-950/90 dark:text-rose-200"
+            className="shrink-0 rounded-full border border-rose-500/30 bg-rose-600 px-3 py-1.5 text-xs font-extrabold text-white shadow-md hover:bg-rose-500"
           >
             ✕ Limpiar ({activeFilterCount})
           </button>
@@ -291,17 +300,16 @@ export function FilterBar({
 
       {/* Expandable Tray: Barrios / Zones, Price Ranges, Calendar Date, & Map Style */}
       {moreOpen && (
-        <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-200/90 bg-white/95 p-3.5 shadow-2xl backdrop-blur-xl sm:max-w-3xl dark:border-slate-800 dark:bg-slate-900/95">
-          {/* Barrios / Zonas de CABA */}
+        <div className="pointer-events-auto flex flex-col gap-3 rounded-2xl border border-slate-900/15 bg-[#fcfaf5]/98 p-4 shadow-2xl backdrop-blur-xl sm:max-w-3xl dark:border-white/15 dark:bg-[#0b0f19]/98">
           <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Ir rápido por zona / barrio
+            <div className="mb-2 flex items-center justify-between">
+              <span className="font-mono-tabular text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Explorar por corredor cultural / barrio
               </span>
               <button
                 type="button"
                 onClick={() => setMoreOpen(false)}
-                className="text-xs font-semibold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                className="text-xs font-bold text-slate-500 hover:text-slate-900 dark:hover:text-white"
               >
                 Cerrar ✕
               </button>
@@ -314,10 +322,10 @@ export function FilterBar({
                     key={z.id}
                     type="button"
                     onClick={() => onSelectZone(z)}
-                    className={`rounded-xl border px-2.5 py-1 text-xs font-semibold transition ${
+                    className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
                       active
-                        ? "border-sky-600 bg-sky-600 text-white"
-                        : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                        ? "border-slate-950 bg-slate-950 text-white dark:border-rose-500 dark:bg-rose-600"
+                        : "border-slate-900/10 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200"
                     }`}
                   >
                     {z.label}
@@ -327,11 +335,11 @@ export function FilterBar({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 border-t border-slate-100 pt-2.5 sm:grid-cols-3 dark:border-slate-800">
+          <div className="grid grid-cols-1 gap-3 border-t border-slate-900/10 pt-3 sm:grid-cols-3 dark:border-white/10">
             {/* Price Buckets */}
             <div>
-              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Rango de precio
+              <span className="font-mono-tabular mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Presupuesto (ARS)
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {PRICE_FILTERS.map((p) => {
@@ -341,10 +349,10 @@ export function FilterBar({
                       key={p.id}
                       type="button"
                       onClick={() => onChange({ ...filters, price: active ? "" : p.id })}
-                      className={`rounded-xl border px-2.5 py-1 text-xs font-semibold transition ${
+                      className={`font-mono-tabular rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
                         active
                           ? "border-emerald-600 bg-emerald-600 text-white"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          : "border-slate-900/10 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200"
                       }`}
                     >
                       {p.shortLabel}
@@ -356,22 +364,22 @@ export function FilterBar({
 
             {/* Custom Date Picker */}
             <div>
-              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Fecha específica
+              <span className="font-mono-tabular mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Fecha en calendario
               </span>
               <input
                 type="date"
                 value={customDate}
                 onChange={(e) => onChange({ ...filters, when: e.target.value })}
                 aria-label="Elegir fecha en el calendario"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-800 focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                className="font-mono-tabular w-full rounded-xl border border-slate-900/10 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 focus:border-slate-900 focus:outline-none dark:border-white/10 dark:bg-slate-800 dark:text-slate-100"
               />
             </div>
 
             {/* Map Visual Theme Switcher */}
             <div>
-              <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Estilo visual del mapa
+              <span className="font-mono-tabular mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
+                Cartografía base
               </span>
               <div className="grid grid-cols-2 gap-1.5">
                 {MAP_THEMES.map((t) => {
@@ -381,10 +389,10 @@ export function FilterBar({
                       key={t.id}
                       type="button"
                       onClick={() => onChangeTheme(t.id)}
-                      className={`rounded-xl border px-2.5 py-1 text-xs font-semibold transition ${
+                      className={`rounded-xl border px-2.5 py-1 text-xs font-bold transition ${
                         active
-                          ? "border-slate-900 bg-slate-900 text-white dark:border-sky-400 dark:bg-sky-500 dark:text-slate-950"
-                          : "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                          ? "border-slate-950 bg-slate-950 text-white dark:border-amber-400 dark:bg-amber-400 dark:text-slate-950"
+                          : "border-slate-900/10 bg-white text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:bg-slate-800 dark:text-slate-200"
                       }`}
                     >
                       {t.label}

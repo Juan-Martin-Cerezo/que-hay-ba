@@ -1,23 +1,31 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const displaySerif = Fraunces({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["600", "700", "800"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700", "800"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Qué Hay BA — Mapa Interactivo de Actividades y Eventos en CABA",
+  title: "Qué Hay BA — Cartografía Cultural y Eventos en Vivo · CABA",
   description:
-    "Descubrí recitales, teatro, museos, ferias gastronómicas, talleres y actividades gratuitas en la Ciudad Autónoma de Buenos Aires en tiempo real.",
+    "Atlas interactivo en tiempo real de recitales, teatro, museos, ferias gastronómicas, talleres y actividades gratuitas en la Ciudad Autónoma de Buenos Aires.",
   openGraph: {
-    title: "Qué Hay BA — Actividades y Eventos en Buenos Aires",
+    title: "Qué Hay BA — Cartografía Cultural de Buenos Aires",
     description:
       "Mapa interactivo en tiempo real con la agenda cultural, teatral y recreativa de la Ciudad de Buenos Aires.",
     locale: "es_AR",
@@ -33,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="es-AR"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${displaySerif.variable} ${jakartaSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
