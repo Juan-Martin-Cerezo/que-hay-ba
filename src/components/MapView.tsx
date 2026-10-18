@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AttributionControl,
   Map as MapLibreMap,
   Marker,
   NavigationControl,
-  Popup,
+  type DataDrivenPropertyValueSpecification,
   type GeoJSONSource,
-  type MapGeoJSONFeature,
-  type MapLayerMouseEvent,
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -50,6 +48,15 @@ export interface EventsGeoJSON {
   }>;
 }
 
+export interface VenueLocationGroup {
+  key: string;
+  lat: number;
+  lng: number;
+  venueName: string;
+  barrio: string | null;
+  events: MapEventProperties[];
+}
+
 interface MapViewProps {
   data: EventsGeoJSON;
   selectedId: number | null;
@@ -57,7 +64,7 @@ interface MapViewProps {
   mapTheme: MapThemeId;
   userLocation: { lat: number; lng: number } | null;
   flyTarget: { lat: number; lng: number; zoom?: number; ts: number } | null;
-  onSelectEvent: (ev: MapEventProperties) => void;
+  onSelectEvent: (ev: MapEventProperties, siblingEvents?: MapEventProperties[]) => void;
 }
 
 const TILE_SOURCES = {
@@ -78,221 +85,15 @@ const TILE_SOURCES = {
   ],
 };
 
-/**
- * Draws a crisp, platform-independent white vector icon at (cx, cy) inside the pin head.
- */
-function drawCategoryGlyph(
-  ctx: CanvasRenderingContext2D,
-  category: string,
-  cx: number,
-  cy: number
-) {
-  ctx.save();
-  ctx.strokeStyle = "#ffffff";
-  ctx.fillStyle = "#ffffff";
-  ctx.lineWidth = 3.2;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  switch (category) {
-    case "musica": {
-      // Beamed eighth notes (♫)
-      ctx.beginPath();
-      ctx.moveTo(cx - 5, cy + 5);
-      ctx.lineTo(cx - 5, cy - 8);
-      ctx.lineTo(cx + 9, cy - 11);
-      ctx.lineTo(cx + 9, cy + 2);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(cx - 8.5, cy + 5.5, 4.2, 0, Math.PI * 2);
-      ctx.arc(cx + 5.5, cy + 2.5, 4.2, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-    case "teatro": {
-      // Theatrical mask / stage shield with smile & eyes
-      ctx.beginPath();
-      ctx.moveTo(cx - 10, cy - 9);
-      ctx.quadraticCurveTo(cx, cy - 12, cx + 10, cy - 9);
-      ctx.lineTo(cx + 9, cy + 1);
-      ctx.quadraticCurveTo(cx, cy + 12, cx, cy + 12);
-      ctx.quadraticCurveTo(cx, cy + 12, cx - 9, cy + 1);
-      ctx.closePath();
-      ctx.stroke();
-
-      // Eyes
-      ctx.beginPath();
-      ctx.arc(cx - 4, cy - 3, 1.8, 0, Math.PI * 2);
-      ctx.arc(cx + 4, cy - 3, 1.8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Smile arc
-      ctx.beginPath();
-      ctx.arc(cx, cy + 1.5, 4.5, 0.15 * Math.PI, 0.85 * Math.PI);
-      ctx.stroke();
-      break;
-    }
-    case "arte": {
-      // Artist palette / museum frame with star
-      ctx.beginPath();
-      ctx.arc(cx, cy, 11, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx - 4, cy - 3.5, 2, 0, Math.PI * 2);
-      ctx.arc(cx + 3, cy - 4.5, 2, 0, Math.PI * 2);
-      ctx.arc(cx + 5.5, cy + 1.5, 2, 0, Math.PI * 2);
-      ctx.arc(cx - 2.5, cy + 4.5, 2.4, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-    case "gastronomia": {
-      // Wine glass / chalice
-      ctx.beginPath();
-      ctx.moveTo(cx - 7, cy - 10);
-      ctx.lineTo(cx + 7, cy - 10);
-      ctx.lineTo(cx + 5, cy - 2);
-      ctx.quadraticCurveTo(cx, cy + 4, cx - 5, cy - 2);
-      ctx.closePath();
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + 2);
-      ctx.lineTo(cx, cy + 10);
-      ctx.moveTo(cx - 5, cy + 10);
-      ctx.lineTo(cx + 5, cy + 10);
-      ctx.stroke();
-      break;
-    }
-    case "aire_libre": {
-      // Botanical tree canopy + trunk
-      ctx.beginPath();
-      ctx.arc(cx, cy - 4.5, 6.5, 0, Math.PI * 2);
-      ctx.arc(cx - 5, cy + 0.5, 5, 0, Math.PI * 2);
-      ctx.arc(cx + 5, cy + 0.5, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 3.2;
-      ctx.beginPath();
-      ctx.moveTo(cx, cy + 3);
-      ctx.lineTo(cx, cy + 11);
-      ctx.stroke();
-      break;
-    }
-    case "talleres":
-    default: {
-      // Graduation cap / open workshop diamond
-      ctx.beginPath();
-      ctx.moveTo(cx, cy - 9);
-      ctx.lineTo(cx + 12, cy - 3);
-      ctx.lineTo(cx, cy + 3);
-      ctx.lineTo(cx - 12, cy - 3);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(cx - 7, cy + 1);
-      ctx.lineTo(cx - 7, cy + 7);
-      ctx.quadraticCurveTo(cx, cy + 11, cx + 7, cy + 7);
-      ctx.lineTo(cx + 7, cy + 1);
-      ctx.stroke();
-      break;
-    }
-  }
-
-  ctx.restore();
-}
-
-/**
- * Generates a high-DPI (pixelRatio: 2) custom teardrop map pin with vector icon
- * and optional emerald "$0" badge for free experiences.
- */
-function createPinImageData(color: string, category: string, isFree: boolean): ImageData {
-  const width = 76;
-  const height = 88;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d")!;
-
-  const cx = width / 2;
-  const cy = 34;
-  const r = 24;
-
-  // Drop shadow
-  ctx.save();
-  ctx.shadowColor = "rgba(15, 23, 42, 0.42)";
-  ctx.shadowBlur = 10;
-  ctx.shadowOffsetY = 4;
-
-  // Teardrop path
-  ctx.beginPath();
-  ctx.arc(cx, cy, r, Math.PI * 0.78, Math.PI * 0.22, false);
-  ctx.quadraticCurveTo(cx + 10, cy + r + 8, cx, height - 8);
-  ctx.quadraticCurveTo(cx - 10, cy + r + 8, cx - r * Math.cos(Math.PI * 0.22), cy + r * Math.sin(Math.PI * 0.22));
-  ctx.closePath();
-
-  ctx.fillStyle = color;
-  ctx.fill();
-  ctx.restore();
-
-  // Crisp white outer border
-  ctx.lineWidth = 4.5;
-  ctx.strokeStyle = "#ffffff";
-  ctx.stroke();
-
-  // Subtle inner dark ring for depth
-  ctx.beginPath();
-  ctx.arc(cx, cy, r - 4, 0, Math.PI * 2);
-  ctx.strokeStyle = "rgba(0, 0, 0, 0.14)";
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Draw white category vector icon inside the pin head
-  drawCategoryGlyph(ctx, category, cx, cy);
-
-  // If free, draw an emerald "$0" pill badge on the top-right corner
-  if (isFree) {
-    const bx = cx + 17;
-    const by = cy - 17;
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(bx, by, 11, 0, Math.PI * 2);
-    ctx.fillStyle = "#10b981";
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = "#ffffff";
-    ctx.stroke();
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 11px sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("$0", bx, by + 0.5);
-    ctx.restore();
-  }
-
-  return ctx.getImageData(0, 0, width, height);
-}
-
-function registerAllCategoryPins(map: MapLibreMap) {
-  for (const c of CATEGORIES) {
-    const normalId = `pin-${c.id}`;
-    const freeId = `pin-${c.id}-free`;
-    if (!map.hasImage(normalId)) {
-      map.addImage(normalId, createPinImageData(c.color, c.id, false), { pixelRatio: 2 });
-    }
-    if (!map.hasImage(freeId)) {
-      map.addImage(freeId, createPinImageData(c.color, c.id, true), { pixelRatio: 2 });
-    }
-  }
-}
-
 function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): StyleSpecification {
+  const colorMatch: unknown[] = ["match", ["get", "category"]];
+  for (const c of CATEGORIES) {
+    colorMatch.push(c.id, c.color);
+  }
+  colorMatch.push("#e11d48");
+
   return {
     version: 8,
-    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
     sources: {
       "base-voyager": {
         type: "raster",
@@ -327,9 +128,6 @@ function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): Sty
       events: {
         type: "geojson",
         data: initialData as unknown as GeoJSON.FeatureCollection,
-        cluster: true,
-        clusterMaxZoom: 13,
-        clusterRadius: 34,
       },
     },
     layers: [
@@ -368,107 +166,24 @@ function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): Sty
         layout: { visibility: activeTheme === "osm" ? "visible" : "none" },
       },
       {
-        id: "clusters-halo",
+        id: "event-pins-halo",
         type: "circle",
         source: "events",
-        filter: ["has", "point_count"],
         paint: {
-          "circle-color": [
-            "step",
-            ["get", "point_count"],
-            "rgba(15, 23, 42, 0.20)",
-            20,
-            "rgba(124, 58, 237, 0.25)",
-            60,
-            "rgba(225, 29, 72, 0.28)",
-          ],
-          "circle-radius": ["step", ["get", "point_count"], 23, 20, 29, 60, 35],
-        },
-      },
-      {
-        id: "clusters",
-        type: "circle",
-        source: "events",
-        filter: ["has", "point_count"],
-        paint: {
-          "circle-color": [
-            "step",
-            ["get", "point_count"],
-            "#0f172a",
-            20,
-            "#7c3aed",
-            60,
-            "#e11d48",
-          ],
-          "circle-radius": ["step", ["get", "point_count"], 16, 20, 21, 60, 26],
-          "circle-stroke-width": 2.5,
-          "circle-stroke-color": "#ffffff",
-        },
-      },
-      {
-        id: "cluster-count",
-        type: "symbol",
-        source: "events",
-        filter: ["has", "point_count"],
-        layout: {
-          "text-field": "{point_count_abbreviated}",
-          "text-font": ["Noto Sans Bold"],
-          "text-size": 12,
-        },
-        paint: {
-          "text-color": "#ffffff",
-        },
-      },
-      {
-        id: "event-hovered-ring",
-        type: "circle",
-        source: "events",
-        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], -1]],
-        paint: {
-          "circle-radius": 24,
-          "circle-color": "rgba(225, 29, 72, 0.22)",
-          "circle-stroke-width": 3,
-          "circle-stroke-color": "#e11d48",
-        },
-      },
-      {
-        id: "event-selected-ring",
-        type: "circle",
-        source: "events",
-        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], -1]],
-        paint: {
-          "circle-radius": 26,
-          "circle-color": "rgba(15, 23, 42, 0.25)",
-          "circle-stroke-width": 3.5,
-          "circle-stroke-color": "#0f172a",
+          "circle-color": colorMatch as DataDrivenPropertyValueSpecification<string>,
+          "circle-opacity": 0.22,
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 8, 14, 13, 17, 18],
         },
       },
       {
         id: "event-pins",
-        type: "symbol",
+        type: "circle",
         source: "events",
-        filter: ["!", ["has", "point_count"]],
-        layout: {
-          "icon-image": [
-            "concat",
-            "pin-",
-            ["get", "category"],
-            ["case", ["boolean", ["get", "isFree"], false], "-free", ""],
-          ],
-          "icon-size": [
-            "interpolate",
-            ["linear"],
-            ["zoom"],
-            10.5,
-            0.72,
-            13,
-            0.9,
-            15.5,
-            1.08,
-          ],
-          "icon-anchor": "bottom",
-          "icon-allow-overlap": true,
-          "icon-ignore-placement": true,
+        paint: {
+          "circle-color": colorMatch as DataDrivenPropertyValueSpecification<string>,
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 4.5, 14, 7, 17, 10],
+          "circle-stroke-width": 2,
+          "circle-stroke-color": "#ffffff",
         },
       },
     ],
@@ -483,6 +198,10 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
+function shortText(str: string, maxLen: number): string {
+  return str.length > maxLen ? `${str.slice(0, maxLen - 1).trim()}…` : str;
+}
+
 export function MapView({
   data,
   selectedId,
@@ -494,17 +213,43 @@ export function MapView({
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const popupRef = useRef<Popup | null>(null);
   const userMarkerRef = useRef<Marker | null>(null);
-  const dataRef = useRef<EventsGeoJSON>(data);
-  const onSelectRef = useRef(onSelectEvent);
+  const bubbleMarkersRef = useRef<Map<string, Marker>>(new Map());
+  const expandedMarkerRef = useRef<Marker | null>(null);
+
+  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
+  const [viewportTick, setViewportTick] = useState(0);
   const [webglError, setWebglError] = useState(false);
 
+  const onSelectRef = useRef(onSelectEvent);
   useEffect(() => {
-    dataRef.current = data;
     onSelectRef.current = onSelectEvent;
-  }, [data, onSelectEvent]);
+  }, [onSelectEvent]);
 
+  // Group experiences that share the exact same physical location/venue
+  const locationGroups = useMemo<VenueLocationGroup[]>(() => {
+    const groups = new Map<string, VenueLocationGroup>();
+    for (const feat of data.features) {
+      const ev = feat.properties;
+      const key = `${ev.lat.toFixed(4)},${ev.lng.toFixed(4)}`;
+      let g = groups.get(key);
+      if (!g) {
+        g = {
+          key,
+          lat: ev.lat,
+          lng: ev.lng,
+          venueName: ev.venueName,
+          barrio: ev.barrio,
+          events: [],
+        };
+        groups.set(key, g);
+      }
+      g.events.push(ev);
+    }
+    return Array.from(groups.values());
+  }, [data.features]);
+
+  // Initialize MapLibre map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
@@ -512,9 +257,9 @@ export function MapView({
     try {
       map = new MapLibreMap({
         container: containerRef.current,
-        style: buildMapStyle(dataRef.current, mapTheme),
-        center: [-58.408, -34.6015],
-        zoom: 12.8,
+        style: buildMapStyle(data, mapTheme),
+        center: [-58.404, -34.6015],
+        zoom: 13.0,
         minZoom: 10.5,
         maxZoom: 18.5,
         maxBounds: [
@@ -528,114 +273,19 @@ export function MapView({
       return;
     }
 
-    // Register custom high-DPI category icon pins immediately
-    registerAllCategoryPins(map);
-
     map.addControl(new AttributionControl({ compact: true }), "bottom-right");
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
 
-    const popup = new Popup({
-      closeButton: false,
-      closeOnClick: false,
-      offset: [0, -36],
-      className: "qhba-popup",
-      maxWidth: "290px",
-    });
-    popupRef.current = popup;
-
-    const syncGeoJSON = () => {
-      registerAllCategoryPins(map);
-      const src = map.getSource("events") as GeoJSONSource | undefined;
-      if (src) {
-        src.setData(dataRef.current as unknown as GeoJSON.FeatureCollection);
-      }
-    };
-
-    map.on("styleimagemissing", (e) => {
-      if (e.id.startsWith("pin-")) {
-        registerAllCategoryPins(map);
-      }
-    });
+    const triggerUpdate = () => setViewportTick((t) => t + 1);
 
     map.on("load", () => {
       map.resize();
-      syncGeoJSON();
+      triggerUpdate();
     });
-
-    map.on("click", "clusters", async (e: MapLayerMouseEvent) => {
-      const features = map.queryRenderedFeatures(e.point, { layers: ["clusters"] });
-      const clusterFeature = features[0];
-      if (!clusterFeature) return;
-      const clusterId = clusterFeature.properties?.cluster_id as number;
-      const src = map.getSource("events") as GeoJSONSource | undefined;
-      if (!src) return;
-      try {
-        const zoom = await src.getClusterExpansionZoom(clusterId);
-        const coords = (clusterFeature.geometry as GeoJSON.Point).coordinates as [number, number];
-        map.easeTo({ center: coords, zoom: Math.min(zoom + 0.7, 17.5), duration: 420 });
-      } catch {
-        // Ignore expansion errors
-      }
-    });
-
-    map.on("click", "event-pins", (e: MapLayerMouseEvent) => {
-      const feat = e.features?.[0] as MapGeoJSONFeature | undefined;
-      if (!feat) return;
-      const props = feat.properties as Record<string, unknown>;
-      const matched = dataRef.current.features.find((f) => f.properties.id === Number(props.id));
-      if (matched) {
-        popup.remove();
-        onSelectRef.current(matched.properties);
-      }
-    });
-
-    map.on("mouseenter", "clusters", () => {
-      map.getCanvas().style.cursor = "pointer";
-    });
-    map.on("mouseleave", "clusters", () => {
-      map.getCanvas().style.cursor = "";
-    });
-
-    map.on("mouseenter", "event-pins", (e: MapLayerMouseEvent) => {
-      map.getCanvas().style.cursor = "pointer";
-      const feat = e.features?.[0] as MapGeoJSONFeature | undefined;
-      if (!feat) return;
-      const props = feat.properties as Record<string, unknown>;
-      const matched = dataRef.current.features.find((f) => f.properties.id === Number(props.id));
-      if (!matched) return;
-      const ev = matched.properties;
-      const cat = categoryById[ev.category] ?? categoryById.arte;
-      const coords = (feat.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
-
-      const html = `
-        <div style="padding:11px 13px;min-width:220px;max-width:275px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:6px;">
-            <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:800;letter-spacing:0.03em;text-transform:uppercase;padding:2px 8px;border-radius:999px;background:${cat.color};color:#fff;">
-              ${cat.emoji} ${escapeHtml(cat.shortLabel)}
-            </span>
-            <span style="font-family:monospace;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:${
-              ev.isFree ? "rgba(16,185,129,0.22)" : "rgba(255,255,255,0.13)"
-            };color:${ev.isFree ? "#34d399" : "#f8fafc"};">
-              ${escapeHtml(ev.priceLabel)}
-            </span>
-          </div>
-          <div style="font-size:13px;font-weight:800;line-height:1.28;color:#ffffff;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
-            ${escapeHtml(ev.title)}
-          </div>
-          <div style="font-size:11px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            📍 ${escapeHtml(ev.venueName)}${ev.barrio ? ` · ${escapeHtml(ev.barrio)}` : ""}
-          </div>
-          <div style="font-family:monospace;font-size:10.5px;color:#94a3b8;margin-top:3px;">
-            🗓️ ${escapeHtml(formatEventDate(ev.startsAt))}
-          </div>
-        </div>
-      `;
-      popup.setLngLat(coords).setHTML(html).addTo(map);
-    });
-
-    map.on("mouseleave", "event-pins", () => {
-      map.getCanvas().style.cursor = "";
-      popup.remove();
+    map.on("moveend", triggerUpdate);
+    map.on("zoomend", triggerUpdate);
+    map.on("click", () => {
+      setExpandedGroupKey(null);
     });
 
     const ro = new ResizeObserver(() => {
@@ -646,14 +296,266 @@ export function MapView({
     mapRef.current = map;
     return () => {
       ro.disconnect();
-      popup.remove();
+      expandedMarkerRef.current?.remove();
+      for (const m of bubbleMarkersRef.current.values()) {
+        m.remove();
+      }
+      bubbleMarkersRef.current.clear();
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Switch active raster base layer instantly when mapTheme changes.
+  // Update GeoJSON source whenever filtered events change
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const applyData = () => {
+      const src = map.getSource("events") as GeoJSONSource | undefined;
+      if (src) {
+        src.setData(data as unknown as GeoJSON.FeatureCollection);
+      }
+      setViewportTick((t) => t + 1);
+    };
+    applyData();
+    map.once("load", applyData);
+  }, [data]);
+
+  // Render real HTML Speech-Bubble "Globitos" on the map for visible locations
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const bounds = map.getBounds();
+    const zoom = map.getZoom();
+
+    // Filter location groups inside current map bounds (or fallback to all if bounds not ready)
+    const inView = locationGroups.filter((g) => {
+      if (!bounds) return true;
+      return (
+        g.lng >= bounds.getWest() - 0.01 &&
+        g.lng <= bounds.getEast() + 0.01 &&
+        g.lat >= bounds.getSouth() - 0.01 &&
+        g.lat <= bounds.getNorth() + 0.01
+      );
+    });
+
+    // Prioritize locations with selected/hovered event, then multi-event hubs, up to 85 globitos simultaneously
+    const maxBubbles = zoom >= 14.5 ? 110 : zoom >= 13 ? 80 : 60;
+    const prioritized = [...inView]
+      .sort((a, b) => {
+        const aActive = a.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0;
+        const bActive = b.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0;
+        if (aActive !== bActive) return bActive - aActive;
+        return b.events.length - a.events.length;
+      })
+      .slice(0, maxBubbles);
+
+    // Clear previous markers and mount crisp updated HTML globitos
+    for (const m of bubbleMarkersRef.current.values()) {
+      m.remove();
+    }
+    bubbleMarkersRef.current.clear();
+
+    for (const group of prioritized) {
+      const count = group.events.length;
+      const primary = group.events[0];
+      const cat = categoryById[primary.category] ?? categoryById.arte;
+      const isSelected = group.events.some((e) => e.id === selectedId);
+      const isHovered = group.events.some((e) => e.id === hoveredId);
+      const hasFree = group.events.some((e) => e.isFree);
+
+      // Collect up to 3 distinct category emojis present at this exact location
+      const uniqueCats = Array.from(new Set(group.events.map((e) => e.category))).slice(0, 3);
+      const iconsHtml = uniqueCats
+        .map((cid) => {
+          const c = categoryById[cid] ?? categoryById.arte;
+          return `<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:${c.color};color:#fff;font-size:12px;border:1.5px solid #fff;margin-right:-4px;box-shadow:0 2px 4px rgba(0,0,0,0.25);">${c.emoji}</span>`;
+        })
+        .join("");
+
+      const el = document.createElement("button");
+      el.type = "button";
+      el.style.cssText = `
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: transparent;
+        border: none;
+        padding: 0;
+        cursor: pointer;
+        transform: ${isSelected || isHovered ? "scale(1.12)" : "scale(1)"};
+        z-index: ${isSelected ? 50 : isHovered ? 40 : count > 1 ? 20 : 10};
+        transition: transform 0.16s ease;
+      `;
+
+      const labelText =
+        count > 1
+          ? `${count} exp. · ${shortText(group.venueName, 18)}`
+          : shortText(primary.title, 20);
+
+      const bgPill = isSelected
+        ? "#0f172a"
+        : isHovered
+          ? "#e11d48"
+          : "rgba(255, 255, 255, 0.97)";
+      const textColor = isSelected || isHovered ? "#ffffff" : "#0f172a";
+      const borderColor = isSelected ? "#f59e0b" : isHovered ? "#ffffff" : cat.color;
+
+      el.innerHTML = `
+        <div style="
+          display: flex;
+          align-items: center;
+          gap: 7px;
+          padding: 3.5px 9px 3.5px 5px;
+          border-radius: 999px;
+          background: ${bgPill};
+          color: ${textColor};
+          border: 2px solid ${borderColor};
+          box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.38);
+          white-space: nowrap;
+          max-width: 230px;
+        ">
+          <div style="display:flex;align-items:center;padding-right:3px;">
+            ${iconsHtml}
+          </div>
+          <span style="font-size:11px;font-weight:800;letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;">
+            ${escapeHtml(labelText)}
+          </span>
+          ${
+            hasFree
+              ? `<span style="font-family:monospace;font-size:9.5px;font-weight:900;padding:1px 5px;border-radius:999px;background:#10b981;color:#ffffff;">$0</span>`
+              : ""
+          }
+        </div>
+        <div style="
+          width: 0;
+          height: 0;
+          border-left: 6px solid transparent;
+          border-right: 6px solid transparent;
+          border-top: 7px solid ${borderColor};
+          margin-top: -1px;
+        "></div>
+      `;
+
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        if (count > 1) {
+          setExpandedGroupKey((prev) => (prev === group.key ? null : group.key));
+          onSelectRef.current(primary, group.events);
+        } else {
+          setExpandedGroupKey(null);
+          onSelectRef.current(primary, group.events);
+        }
+      });
+
+      const marker = new Marker({ element: el, anchor: "bottom" })
+        .setLngLat([group.lng, group.lat])
+        .addTo(map);
+
+      bubbleMarkersRef.current.set(group.key, marker);
+    }
+  }, [locationGroups, viewportTick, selectedId, hoveredId]);
+
+  // Render on-map expanded "Racimo de Globitos" popover when a multi-experience location is clicked
+  useEffect(() => {
+    const map = mapRef.current;
+    expandedMarkerRef.current?.remove();
+    expandedMarkerRef.current = null;
+
+    if (!map || !expandedGroupKey) return;
+    const group = locationGroups.find((g) => g.key === expandedGroupKey);
+    if (!group || group.events.length <= 1) return;
+
+    const container = document.createElement("div");
+    container.style.cssText = `
+      background: rgba(11, 15, 25, 0.96);
+      color: #f8fafc;
+      border: 1.5px solid rgba(255, 255, 255, 0.18);
+      border-radius: 20px;
+      padding: 10px;
+      width: 280px;
+      max-height: 270px;
+      overflow-y: auto;
+      box-shadow: 0 24px 42px -8px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(16px);
+      z-index: 90;
+      margin-bottom: 36px;
+    `;
+
+    const header = document.createElement("div");
+    header.style.cssText = `
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 4px 8px 4px;
+      border-bottom: 1px dashed rgba(255,255,255,0.15);
+      margin-bottom: 7px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #fbbf24;
+    `;
+    header.innerHTML = `
+      <span>📍 ${escapeHtml(shortText(group.venueName, 26))} (${group.events.length})</span>
+      <button type="button" style="color:#94a3b8;font-size:12px;font-weight:800;cursor:pointer;background:none;border:none;">✕</button>
+    `;
+    header.querySelector("button")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setExpandedGroupKey(null);
+    });
+    container.appendChild(header);
+
+    const list = document.createElement("div");
+    list.style.cssText = "display:flex;flex-direction:column;gap:5px;";
+
+    for (const ev of group.events) {
+      const cat = categoryById[ev.category] ?? categoryById.arte;
+      const itemBtn = document.createElement("button");
+      itemBtn.type = "button";
+      itemBtn.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        text-align: left;
+        padding: 6px 8px;
+        border-radius: 12px;
+        background: ${ev.id === selectedId ? "rgba(225, 29, 72, 0.28)" : "rgba(255, 255, 255, 0.07)"};
+        border: 1px solid ${ev.id === selectedId ? "#e11d48" : "rgba(255, 255, 255, 0.1)"};
+        color: #ffffff;
+        cursor: pointer;
+      `;
+      itemBtn.innerHTML = `
+        <span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;background:${cat.color};font-size:13px;flex-shrink:0;">
+          ${cat.emoji}
+        </span>
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${escapeHtml(ev.title)}
+          </div>
+          <div style="font-family:monospace;font-size:10px;color:#cbd5e1;display:flex;justify-content:space-between;gap:4px;">
+            <span>${escapeHtml(formatEventDate(ev.startsAt))}</span>
+            <span style="color:${ev.isFree ? "#34d399" : "#fde68a"};font-weight:800;">${escapeHtml(ev.priceLabel)}</span>
+          </div>
+        </div>
+      `;
+      itemBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onSelectRef.current(ev, group.events);
+      });
+      list.appendChild(itemBtn);
+    }
+
+    container.appendChild(list);
+    container.addEventListener("click", (e) => e.stopPropagation());
+
+    expandedMarkerRef.current = new Marker({ element: container, anchor: "bottom" })
+      .setLngLat([group.lng, group.lat])
+      .addTo(map);
+  }, [expandedGroupKey, locationGroups, selectedId]);
+
+  // Switch active raster base layer instantly when mapTheme changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -673,55 +575,18 @@ export function MapView({
     }
   }, [mapTheme]);
 
-  // Update GeoJSON source whenever filtered events change.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const applyData = () => {
-      registerAllCategoryPins(map);
-      const src = map.getSource("events") as GeoJSONSource | undefined;
-      if (src) {
-        src.setData(data as unknown as GeoJSON.FeatureCollection);
-      }
-    };
-    applyData();
-    map.once("load", applyData);
-  }, [data]);
-
-  // Highlight selected event pin.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.getLayer("event-selected-ring")) return;
-    map.setFilter("event-selected-ring", [
-      "all",
-      ["!", ["has", "point_count"]],
-      ["==", ["get", "id"], selectedId ?? -1],
-    ]);
-  }, [selectedId]);
-
-  // Highlight hovered event pin from the sidebar list.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !map.getLayer("event-hovered-ring")) return;
-    map.setFilter("event-hovered-ring", [
-      "all",
-      ["!", ["has", "point_count"]],
-      ["==", ["get", "id"], hoveredId ?? -1],
-    ]);
-  }, [hoveredId]);
-
-  // Fly to requested target.
+  // Fly to requested target
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyTarget) return;
     map.flyTo({
       center: [flyTarget.lng, flyTarget.lat],
-      zoom: flyTarget.zoom ?? Math.max(map.getZoom(), 15.2),
-      duration: 650,
+      zoom: flyTarget.zoom ?? Math.max(map.getZoom(), 15),
+      duration: 600,
     });
   }, [flyTarget]);
 
-  // Render user location marker.
+  // Render user location marker
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;

@@ -408,9 +408,21 @@ export function ExploreClient() {
       {/* Selected Event Sheet */}
       <EventSheet
         event={selected}
+        siblingEvents={
+          selected
+            ? data.features
+                .map((f) => f.properties)
+                .filter(
+                  (e) =>
+                    e.lat.toFixed(4) === selected.lat.toFixed(4) &&
+                    e.lng.toFixed(4) === selected.lng.toFixed(4)
+                )
+            : []
+        }
         isFavorite={selected ? isFavorite(selected.id) : false}
         userLocation={userLocation}
         onClose={() => setSelected(null)}
+        onSelectSibling={(ev) => setSelected(ev)}
         onToggleFavorite={toggleFavorite}
       />
 

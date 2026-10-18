@@ -13,9 +13,11 @@ interface EventDetail extends MapEventProperties {
 
 interface EventSheetProps {
   event: MapEventProperties | null;
+  siblingEvents: MapEventProperties[];
   isFavorite: boolean;
   userLocation: { lat: number; lng: number } | null;
   onClose: () => void;
+  onSelectSibling: (ev: MapEventProperties) => void;
   onToggleFavorite: (item: FavoriteItem) => void;
 }
 
@@ -35,9 +37,11 @@ function buildGoogleCalendarUrl(ev: MapEventProperties): string {
 
 export function EventSheet({
   event,
+  siblingEvents,
   isFavorite,
   userLocation,
   onClose,
+  onSelectSibling,
   onToggleFavorite,
 }: EventSheetProps) {
   const [detail, setDetail] = useState<EventDetail | null>(null);
@@ -171,6 +175,36 @@ export function EventSheet({
           </span>
         </div>
       </div>
+
+      {/* Co-located experiences switcher ("en la misma ubicación") */}
+      {siblingEvents.length > 1 && (
+        <div className="border-b border-slate-900/10 bg-amber-500/10 px-3.5 py-2 dark:border-white/10 dark:bg-amber-500/15">
+          <p className="font-mono-tabular mb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-300">
+            📍 {siblingEvents.length} experiencias en esta misma ubicación ({current.venueName})
+          </p>
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {siblingEvents.map((sib) => {
+              const sibCat = categoryById[sib.category] ?? categoryById.arte;
+              const active = sib.id === current.id;
+              return (
+                <button
+                  key={sib.id}
+                  type="button"
+                  onClick={() => onSelectSibling(sib)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
+                    active
+                      ? "border-slate-950 bg-slate-950 text-white dark:border-rose-500 dark:bg-rose-600"
+                      : "border-slate-900/15 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200"
+                  }`}
+                >
+                  <span>{sibCat.emoji}</span>
+                  <span className="max-w-[140px] truncate">{sib.title}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Scrollable Body */}
       <div className="flex-1 space-y-3.5 overflow-y-auto p-4 text-sm">
