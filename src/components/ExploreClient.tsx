@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { categoryById } from "@/lib/domain";
+import { CABA_ZONES, categoryById, type MapThemeId } from "@/lib/domain";
 import { useFavorites, type FavoriteItem } from "@/lib/favorites";
 import { distanceKm, formatEventDate } from "@/lib/format";
 import { EventSheet } from "./EventSheet";
@@ -16,6 +16,8 @@ const EMPTY_GEOJSON: EventsGeoJSON = {
   features: [],
 };
 
+type SortMode = "upcoming" | "free" | "nearest";
+
 export function ExploreClient() {
   const [filters, setFilters] = useState<FilterState>({
     q: "",
@@ -27,8 +29,12 @@ export function ExploreClient() {
   const [data, setData] = useState<EventsGeoJSON>(EMPTY_GEOJSON);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<MapEventProperties | null>(null);
+  const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
   const [listOpen, setListOpen] = useState(false);
+  const [sortMode, setSortMode] = useState<SortMode>("upcoming");
+  const [activeZone, setActiveZone] = useState<string>("all");
+  const [mapTheme, setMapTheme] = useState<MapThemeId>("voyager");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [flyTarget, setFlyTarget] = useState<{
@@ -40,8 +46,15 @@ export function ExploreClient() {
 
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
+  // Open discovery sidebar by default on desktop screens
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(filters.q.trim()), 240);
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setListOpen(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQ(filters.q.trim()), 220);
     return () => clearTimeout(t);
   }, [filters.q]);
 
@@ -75,7 +88,15 @@ export function ExploreClient() {
 
   const handleSelectEvent = useCallback((ev: MapEventProperties) => {
     setSelected(ev);
-    setFlyTarget({ lat: ev.lat, lng: ev.lng, zoom: 15.5, ts: Date.now() });
+    setFlyTarget({ lat: ev.lat, lng: ev.lng, zoom: 15.8, ts: Date.now() });
+    if (typeof window !== "undefined" && window.innerWidth < 640) {
+      setListOpen(false);
+    }
+  }, []);
+
+  const handleSelectZone = useCallback((zone: (typeof CABA_ZONES)[number]) => {
+    setActiveZone(zone.id);
+    setFlyTarget({ lat: zone.lat, lng: zone.lng, zoom: zone.zoom, ts: Date.now() });
   }, []);
 
   const handleLocateUser = useCallback(() => {
@@ -85,6 +106,7 @@ export function ExploreClient() {
       (pos) => {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLocation(loc);
+        setSortMode("nearest");
         setFlyTarget({ lat: loc.lat, lng: loc.lng, zoom: 14.5, ts: Date.now() });
         setLocating(false);
       },
@@ -97,15 +119,22 @@ export function ExploreClient() {
 
   const sortedEvents = useMemo(() => {
     const list = data.features.map((f) => f.properties);
-    if (!userLocation) return list.slice(0, 80);
-    return [...list]
-      .sort(
-        (a, b) =>
-          distanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) -
-          distanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng)
-      )
-      .slice(0, 80);
-  }, [data.features, userLocation]);
+    if (sortMode === "nearest" && userLocation) {
+      return [...list]
+        .sort(
+          (a, b) =>
+            distanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) -
+            distanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng)
+        )
+        .slice(0, 100);
+    }
+    if (sortMode === "free") {
+      return [...list]
+        .sort((a, b) => Number(b.isFree) - Number(a.isFree))
+        .slice(0, 100);
+    }
+    return list.slice(0, 100);
+  }, [data.features, sortMode, userLocation]);
 
   const handleSelectFavorite = useCallback(
     (item: FavoriteItem) => {
@@ -114,7 +143,7 @@ export function ExploreClient() {
       if (existing) {
         handleSelectEvent(existing);
       } else {
-        setFlyTarget({ lat: item.lat, lng: item.lng, zoom: 15.5, ts: Date.now() });
+        setFlyTarget({ lat: item.lat, lng: item.lng, zoom: 15.8, ts: Date.now() });
         fetch(`/api/events/${item.id}`)
           .then((r) => (r.ok ? r.json() : null))
           .then((ev) => {
@@ -126,8 +155,26 @@ export function ExploreClient() {
     [data.features, handleSelectEvent]
   );
 
+  const cycleMapTheme = () => {
+    const order: MapThemeId[] = ["voyager", "dark", "light", "osm"];
+    const next = order[(order.indexOf(mapTheme) + 1) % order.length];
+    setMapTheme(next);
+  };
+
   return (
-    <main className="relative h-dvh w-screen overflow-hidden bg-slate-100 dark:bg-slate-950">
+    <main className="relative h-dvh w-screen overflow-hidden bg-slate-200 select-none dark:bg-slate-950">
+      {/* Interactive Full-Viewport Map */}
+      <MapView
+        data={data}
+        selectedId={selected?.id ?? null}
+        hoveredId={hoveredId}
+        mapTheme={mapTheme}
+        userLocation={userLocation}
+        flyTarget={flyTarget}
+        onSelectEvent={handleSelectEvent}
+      />
+
+      {/* Top Floating Search & Filter Command Bar */}
       <FilterBar
         filters={filters}
         total={data.total}
@@ -135,62 +182,109 @@ export function ExploreClient() {
         favoritesCount={favorites.length}
         locating={locating}
         hasUserLocation={Boolean(userLocation)}
+        activeZone={activeZone}
+        mapTheme={mapTheme}
         onChange={setFilters}
+        onSelectZone={handleSelectZone}
+        onChangeTheme={setMapTheme}
         onOpenFavorites={() => setFavoritesOpen(true)}
         onLocateUser={handleLocateUser}
       />
 
-      <MapView
-        data={data}
-        selectedId={selected?.id ?? null}
-        userLocation={userLocation}
-        flyTarget={flyTarget}
-        onSelectEvent={handleSelectEvent}
-      />
-
-      {/* Bottom-left controls: toggle list view + about link */}
-      <div className="pointer-events-none absolute bottom-4 left-3 z-20 flex items-center gap-2 sm:left-4">
-        <button
-          type="button"
-          onClick={() => setListOpen((v) => !v)}
-          className="pointer-events-auto flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-xs font-semibold text-slate-800 shadow-lg backdrop-blur transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-100"
-        >
-          <span>{listOpen ? "🗺️ Ocultar lista" : "📋 Ver listado"}</span>
-          <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] text-white dark:bg-sky-500 dark:text-slate-950">
-            {data.total}
-          </span>
-        </button>
-
-        <Link
-          href="/acerca"
-          className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-3 py-2 text-xs font-medium text-slate-600 shadow-lg backdrop-blur hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300"
-        >
-          Fuentes
-        </Link>
-      </div>
-
-      {/* Collapsible left event list drawer */}
+      {/* Collapsible Discovery Sidebar (Desktop Left Panel / Mobile Bottom Sheet) */}
       {listOpen && (
         <section
           aria-label="Listado de actividades"
-          className="fixed bottom-16 left-3 right-3 z-20 flex max-h-[56vh] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur sm:bottom-16 sm:left-4 sm:right-auto sm:top-44 sm:max-h-none sm:w-[360px] dark:border-slate-800 dark:bg-slate-900/95"
+          className="fixed bottom-16 left-2.5 right-2.5 z-20 flex max-h-[58dvh] flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white/95 shadow-2xl backdrop-blur-xl sm:bottom-16 sm:left-3.5 sm:right-auto sm:top-28 sm:max-h-none sm:w-[370px] dark:border-slate-800/90 dark:bg-slate-900/95"
         >
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2.5 text-xs font-semibold text-slate-700 dark:border-slate-800 dark:text-slate-200">
-            <span>
-              {userLocation ? "Actividades más cercanas" : "Próximas actividades"}
-            </span>
+          {/* Quick Barrio Jump Strip inside panel */}
+          <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-200/70 bg-slate-50/70 px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-800/80 dark:bg-slate-800/40">
+            {CABA_ZONES.map((z) => {
+              const active = activeZone === z.id;
+              return (
+                <button
+                  key={z.id}
+                  type="button"
+                  onClick={() => handleSelectZone(z)}
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                    active
+                      ? "bg-sky-600 text-white shadow-xs"
+                      : "bg-white/90 text-slate-600 hover:bg-white hover:text-slate-900 dark:bg-slate-800 dark:text-slate-300"
+                  }`}
+                >
+                  {z.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Panel Header + Sort Tabs */}
+          <div className="flex items-center justify-between border-b border-slate-200/80 px-3.5 py-2 dark:border-slate-800">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setSortMode("upcoming")}
+                className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                  sortMode === "upcoming"
+                    ? "bg-slate-900 text-white dark:bg-sky-500 dark:text-slate-950"
+                    : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                }`}
+              >
+                Próximos
+              </button>
+              <button
+                type="button"
+                onClick={() => setSortMode("free")}
+                className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                  sortMode === "free"
+                    ? "bg-emerald-600 text-white"
+                    : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                }`}
+              >
+                Gratis primero
+              </button>
+              {userLocation && (
+                <button
+                  type="button"
+                  onClick={() => setSortMode("nearest")}
+                  className={`rounded-lg px-2 py-1 text-[11px] font-bold transition ${
+                    sortMode === "nearest"
+                      ? "bg-sky-600 text-white"
+                      : "text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                  }`}
+                >
+                  Cerca mío
+                </button>
+              )}
+            </div>
+
             <button
               type="button"
               onClick={() => setListOpen(false)}
-              className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+              className="flex h-6 w-6 items-center justify-center rounded-full text-xs text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+              aria-label="Cerrar listado"
             >
               ✕
             </button>
           </div>
-          <div className="flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+
+          {/* Scrollable Event Cards */}
+          <div className="flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800/70">
             {sortedEvents.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-500">
-                No encontramos eventos con esos filtros. Probá ampliar la búsqueda.
+              <div className="flex flex-col items-center justify-center gap-2 p-8 text-center">
+                <span className="text-2xl">🔍</span>
+                <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                  No encontramos actividades con esos filtros
+                </p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setFilters({ q: "", when: "", price: "", categories: [] })
+                  }
+                  className="rounded-xl bg-sky-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-sky-500"
+                >
+                  Ver todas las actividades
+                </button>
               </div>
             ) : (
               sortedEvents.map((ev) => {
@@ -199,38 +293,45 @@ export function ExploreClient() {
                   userLocation != null
                     ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng)
                     : null;
+                const isSelected = selected?.id === ev.id;
                 return (
                   <button
                     key={ev.id}
                     type="button"
+                    onMouseEnter={() => setHoveredId(ev.id)}
+                    onMouseLeave={() => setHoveredId(null)}
                     onClick={() => handleSelectEvent(ev)}
-                    className={`flex w-full items-start gap-3 p-3 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60 ${
-                      selected?.id === ev.id ? "bg-sky-50/70 dark:bg-sky-950/40" : ""
+                    className={`group flex w-full items-start gap-3 p-3 text-left transition ${
+                      isSelected
+                        ? "bg-sky-50/90 dark:bg-sky-950/50"
+                        : "hover:bg-slate-50/90 dark:hover:bg-slate-800/50"
                     }`}
                   >
-                    <span
-                      className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm text-white"
+                    <div
+                      className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl text-sm text-white shadow-sm transition group-hover:scale-105"
                       style={{ backgroundColor: cat.color }}
                     >
                       {cat.emoji}
-                    </span>
+                    </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 text-[11px] font-medium text-slate-500">
-                        <span className="truncate">{formatEventDate(ev.startsAt)}</span>
+                      <div className="flex items-center justify-between gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                        <span className="truncate capitalize">
+                          {formatEventDate(ev.startsAt)}
+                        </span>
                         <span
-                          className={`shrink-0 font-semibold ${
+                          className={`shrink-0 rounded-full px-2 py-0.2 text-[10px] font-extrabold ${
                             ev.isFree
-                              ? "text-emerald-600 dark:text-emerald-400"
-                              : "text-slate-700 dark:text-slate-300"
+                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                              : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
                           }`}
                         >
                           {ev.priceLabel}
                         </span>
                       </div>
-                      <div className="truncate text-xs font-bold text-slate-900 dark:text-white">
+                      <div className="mt-0.5 line-clamp-1 text-xs font-extrabold text-slate-900 group-hover:text-sky-600 dark:text-white dark:group-hover:text-sky-400">
                         {ev.title}
                       </div>
-                      <div className="truncate text-[11px] text-slate-500">
+                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
                         {ev.venueName}
                         {ev.barrio ? ` · ${ev.barrio}` : ""}
                         {dist != null ? ` · ${dist.toFixed(1)} km` : ""}
@@ -244,6 +345,58 @@ export function ExploreClient() {
         </section>
       )}
 
+      {/* Bottom Floating Control Dock */}
+      <div className="pointer-events-none absolute bottom-3.5 left-2.5 right-14 z-20 flex flex-wrap items-center gap-2 sm:left-3.5">
+        <button
+          type="button"
+          onClick={() => setListOpen((v) => !v)}
+          className="pointer-events-auto flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/95 px-4 py-2 text-xs font-extrabold text-slate-900 shadow-xl backdrop-blur-xl transition hover:scale-[1.02] hover:bg-white dark:border-slate-700 dark:bg-slate-900/95 dark:text-white"
+        >
+          <span>{listOpen ? "🗺️ Ocultar lista" : "📋 Explorar lista"}</span>
+          <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-extrabold text-white">
+            {data.total}
+          </span>
+        </button>
+
+        {/* Quick 1-Click Map Style Toggle */}
+        <button
+          type="button"
+          onClick={cycleMapTheme}
+          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-white/95 px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur-xl transition hover:bg-white dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200"
+          title="Cambiar estilo visual del mapa"
+        >
+          <span>🎨</span>
+          <span>
+            {mapTheme === "voyager"
+              ? "Mapa: Color"
+              : mapTheme === "dark"
+                ? "Mapa: Nocturno"
+                : mapTheme === "light"
+                  ? "Mapa: Claro"
+                  : "Mapa: Callejero"}
+          </span>
+        </button>
+
+        {/* Re-center CABA button */}
+        <button
+          type="button"
+          onClick={() => handleSelectZone(CABA_ZONES[0])}
+          className="pointer-events-auto hidden items-center gap-1 rounded-full border border-slate-200/90 bg-white/95 px-3 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur-xl transition hover:bg-white sm:flex dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-200"
+          title="Ver toda la Ciudad de Buenos Aires"
+        >
+          <span>🎯</span>
+          <span>Toda CABA</span>
+        </button>
+
+        <Link
+          href="/acerca"
+          className="pointer-events-auto rounded-full border border-slate-200/90 bg-white/95 px-3 py-2 text-xs font-bold text-slate-600 shadow-xl backdrop-blur-xl transition hover:text-slate-900 dark:border-slate-700 dark:bg-slate-900/95 dark:text-slate-300"
+        >
+          Fuentes
+        </Link>
+      </div>
+
+      {/* Selected Event Sheet */}
       <EventSheet
         event={selected}
         isFavorite={selected ? isFavorite(selected.id) : false}
@@ -252,6 +405,7 @@ export function ExploreClient() {
         onToggleFavorite={toggleFavorite}
       />
 
+      {/* Saved Favourites Drawer */}
       <FavoritesDrawer
         open={favoritesOpen}
         items={favorites}

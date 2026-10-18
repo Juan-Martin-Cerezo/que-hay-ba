@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AttributionControl,
   Map as MapLibreMap,
   Marker,
   NavigationControl,
+  Popup,
   type DataDrivenPropertyValueSpecification,
   type GeoJSONSource,
   type MapGeoJSONFeature,
   type MapLayerMouseEvent,
+  type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { CATEGORIES, type CategoryId } from "@/lib/domain";
+import { CATEGORIES, categoryById, type CategoryId, type MapThemeId } from "@/lib/domain";
+import { formatEventDate } from "@/lib/format";
 
 export interface MapEventProperties {
   id: number;
@@ -51,74 +54,106 @@ export interface EventsGeoJSON {
 interface MapViewProps {
   data: EventsGeoJSON;
   selectedId: number | null;
+  hoveredId: number | null;
+  mapTheme: MapThemeId;
   userLocation: { lat: number; lng: number } | null;
   flyTarget: { lat: number; lng: number; zoom?: number; ts: number } | null;
   onSelectEvent: (ev: MapEventProperties) => void;
 }
 
-const STYLE_LIGHT = "https://tiles.openfreemap.org/styles/positron";
-const STYLE_DARK = "https://tiles.openfreemap.org/styles/dark";
+const TILE_SOURCES: Record<MapThemeId, string[]> = {
+  voyager: [
+    "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+    "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+    "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+  ],
+  light: [
+    "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
+    "https://b.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
+    "https://c.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
+  ],
+  dark: [
+    "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png",
+    "https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png",
+    "https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png",
+  ],
+  osm: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+};
 
-export function MapView({
-  data,
-  selectedId,
-  userLocation,
-  flyTarget,
-  onSelectEvent,
-}: MapViewProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<MapLibreMap | null>(null);
-  const userMarkerRef = useRef<Marker | null>(null);
-  const dataRef = useRef<EventsGeoJSON>(data);
-  const onSelectRef = useRef(onSelectEvent);
+function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): StyleSpecification {
+  const colorMatch: unknown[] = ["match", ["get", "category"]];
+  for (const c of CATEGORIES) {
+    colorMatch.push(c.id, c.color);
+  }
+  colorMatch.push("#2563eb");
 
-  useEffect(() => {
-    dataRef.current = data;
-    onSelectRef.current = onSelectEvent;
-  }, [data, onSelectEvent]);
-
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
-
-    const prefersDark =
-      typeof window !== "undefined" &&
-      window.matchMedia?.("(prefers-color-scheme: dark)").matches;
-
-    const map = new MapLibreMap({
-      container: containerRef.current,
-      style: prefersDark ? STYLE_DARK : STYLE_LIGHT,
-      center: [-58.4173, -34.6037],
-      zoom: 12.2,
-      minZoom: 10.5,
-      maxZoom: 18.5,
-      maxBounds: [
-        [-58.62, -34.76],
-        [-58.26, -34.49],
-      ],
-      attributionControl: false,
-    });
-
-    map.addControl(new AttributionControl({ compact: true }), "bottom-right");
-    map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
-
-    const colorMatch: unknown[] = ["match", ["get", "category"]];
-    for (const c of CATEGORIES) {
-      colorMatch.push(c.id, c.color);
-    }
-    colorMatch.push("#475569");
-
-    const setupLayers = () => {
-      if (map.getSource("events")) return;
-
-      map.addSource("events", {
+  return {
+    version: 8,
+    glyphs: "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+    sources: {
+      "base-voyager": {
+        type: "raster",
+        tiles: TILE_SOURCES.voyager,
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors © CARTO",
+      },
+      "base-light": {
+        type: "raster",
+        tiles: TILE_SOURCES.light,
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors © CARTO",
+      },
+      "base-dark": {
+        type: "raster",
+        tiles: TILE_SOURCES.dark,
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors © CARTO",
+      },
+      "base-osm": {
+        type: "raster",
+        tiles: TILE_SOURCES.osm,
+        tileSize: 256,
+        attribution: "© OpenStreetMap contributors",
+      },
+      events: {
         type: "geojson",
-        data: dataRef.current as unknown as GeoJSON.FeatureCollection,
+        data: initialData as unknown as GeoJSON.FeatureCollection,
         cluster: true,
         clusterMaxZoom: 15,
-        clusterRadius: 46,
-      });
-
-      map.addLayer({
+        clusterRadius: 44,
+      },
+    },
+    layers: [
+      {
+        id: "layer-voyager",
+        type: "raster",
+        source: "base-voyager",
+        layout: { visibility: activeTheme === "voyager" ? "visible" : "none" },
+      },
+      {
+        id: "layer-light",
+        type: "raster",
+        source: "base-light",
+        layout: { visibility: activeTheme === "light" ? "visible" : "none" },
+      },
+      {
+        id: "layer-dark",
+        type: "raster",
+        source: "base-dark",
+        layout: { visibility: activeTheme === "dark" ? "visible" : "none" },
+        paint: {
+          "raster-brightness-min": 0.08,
+          "raster-contrast": 0.18,
+          "raster-saturation": 0.15,
+        },
+      },
+      {
+        id: "layer-osm",
+        type: "raster",
+        source: "base-osm",
+        layout: { visibility: activeTheme === "osm" ? "visible" : "none" },
+      },
+      {
         id: "clusters-halo",
         type: "circle",
         source: "events",
@@ -127,17 +162,16 @@ export function MapView({
           "circle-color": [
             "step",
             ["get", "point_count"],
-            "rgba(37, 99, 235, 0.18)",
+            "rgba(37, 99, 235, 0.22)",
             20,
-            "rgba(124, 58, 237, 0.22)",
+            "rgba(124, 58, 237, 0.26)",
             75,
-            "rgba(225, 29, 72, 0.24)",
+            "rgba(225, 29, 72, 0.28)",
           ],
-          "circle-radius": ["step", ["get", "point_count"], 24, 20, 30, 75, 36],
+          "circle-radius": ["step", ["get", "point_count"], 24, 20, 30, 75, 37],
         },
-      });
-
-      map.addLayer({
+      },
+      {
         id: "clusters",
         type: "circle",
         source: "events",
@@ -156,50 +190,137 @@ export function MapView({
           "circle-stroke-width": 2.5,
           "circle-stroke-color": "#ffffff",
         },
-      });
-
-      map.addLayer({
+      },
+      {
         id: "cluster-count",
         type: "symbol",
         source: "events",
         filter: ["has", "point_count"],
         layout: {
           "text-field": "{point_count_abbreviated}",
+          "text-font": ["Noto Sans Bold"],
           "text-size": 12,
         },
         paint: {
           "text-color": "#ffffff",
         },
-      });
-
-      map.addLayer({
+      },
+      {
+        id: "event-hovered-ring",
+        type: "circle",
+        source: "events",
+        filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], -1]],
+        paint: {
+          "circle-radius": 18,
+          "circle-color": "rgba(14, 165, 233, 0.24)",
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "#0284c7",
+        },
+      },
+      {
         id: "event-selected-ring",
         type: "circle",
         source: "events",
         filter: ["all", ["!", ["has", "point_count"]], ["==", ["get", "id"], -1]],
         paint: {
-          "circle-radius": 17,
-          "circle-color": "rgba(15, 23, 42, 0.15)",
-          "circle-stroke-width": 3,
+          "circle-radius": 20,
+          "circle-color": "rgba(15, 23, 42, 0.22)",
+          "circle-stroke-width": 3.5,
           "circle-stroke-color": "#0f172a",
         },
-      });
-
-      map.addLayer({
+      },
+      {
         id: "event-pins",
         type: "circle",
         source: "events",
         filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-color": colorMatch as DataDrivenPropertyValueSpecification<string>,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 7, 14, 9.5, 17, 12],
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 6.5, 13.5, 9, 16.5, 12.5],
           "circle-stroke-width": 2.2,
           "circle-stroke-color": "#ffffff",
         },
+      },
+    ],
+  };
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+export function MapView({
+  data,
+  selectedId,
+  hoveredId,
+  mapTheme,
+  userLocation,
+  flyTarget,
+  onSelectEvent,
+}: MapViewProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const popupRef = useRef<Popup | null>(null);
+  const userMarkerRef = useRef<Marker | null>(null);
+  const dataRef = useRef<EventsGeoJSON>(data);
+  const onSelectRef = useRef(onSelectEvent);
+  const [webglError, setWebglError] = useState(false);
+
+  useEffect(() => {
+    dataRef.current = data;
+    onSelectRef.current = onSelectEvent;
+  }, [data, onSelectEvent]);
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    let map: MapLibreMap;
+    try {
+      map = new MapLibreMap({
+        container: containerRef.current,
+        style: buildMapStyle(dataRef.current, mapTheme),
+        center: [-58.4173, -34.6037],
+        zoom: 12.3,
+        minZoom: 10.5,
+        maxZoom: 18.5,
+        maxBounds: [
+          [-58.62, -34.76],
+          [-58.26, -34.49],
+        ],
+        attributionControl: false,
       });
+    } catch {
+      setWebglError(true);
+      return;
+    }
+
+    map.addControl(new AttributionControl({ compact: true }), "bottom-right");
+    map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
+
+    const popup = new Popup({
+      closeButton: false,
+      closeOnClick: false,
+      offset: 14,
+      className: "qhba-popup",
+      maxWidth: "280px",
+    });
+    popupRef.current = popup;
+
+    const syncGeoJSON = () => {
+      const src = map.getSource("events") as GeoJSONSource | undefined;
+      if (src) {
+        src.setData(dataRef.current as unknown as GeoJSON.FeatureCollection);
+      }
     };
 
-    map.on("load", setupLayers);
+    map.on("load", () => {
+      map.resize();
+      syncGeoJSON();
+    });
 
     map.on("click", "clusters", async (e: MapLayerMouseEvent) => {
       const features = map.queryRenderedFeatures(e.point, { layers: ["clusters"] });
@@ -211,7 +332,7 @@ export function MapView({
       try {
         const zoom = await src.getClusterExpansionZoom(clusterId);
         const coords = (clusterFeature.geometry as GeoJSON.Point).coordinates as [number, number];
-        map.easeTo({ center: coords, zoom: Math.min(zoom + 0.5, 17.5), duration: 450 });
+        map.easeTo({ center: coords, zoom: Math.min(zoom + 0.6, 17.5), duration: 420 });
       } catch {
         // Ignore expansion errors
       }
@@ -223,34 +344,97 @@ export function MapView({
       const props = feat.properties as Record<string, unknown>;
       const matched = dataRef.current.features.find((f) => f.properties.id === Number(props.id));
       if (matched) {
+        popup.remove();
         onSelectRef.current(matched.properties);
       }
     });
 
-    for (const layerId of ["clusters", "event-pins"]) {
-      map.on("mouseenter", layerId, () => {
-        map.getCanvas().style.cursor = "pointer";
-      });
-      map.on("mouseleave", layerId, () => {
-        map.getCanvas().style.cursor = "";
-      });
-    }
+    map.on("mouseenter", "clusters", () => {
+      map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", "clusters", () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    map.on("mouseenter", "event-pins", (e: MapLayerMouseEvent) => {
+      map.getCanvas().style.cursor = "pointer";
+      const feat = e.features?.[0] as MapGeoJSONFeature | undefined;
+      if (!feat) return;
+      const props = feat.properties as Record<string, unknown>;
+      const matched = dataRef.current.features.find((f) => f.properties.id === Number(props.id));
+      if (!matched) return;
+      const ev = matched.properties;
+      const cat = categoryById[ev.category] ?? categoryById.arte;
+      const coords = (feat.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+
+      const html = `
+        <div style="padding:10px 12px;min-width:210px;max-width:265px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:5px;">
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:${cat.color};color:#fff;">
+              ${cat.emoji} ${escapeHtml(cat.shortLabel)}
+            </span>
+            <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;background:${
+              ev.isFree ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.12)"
+            };color:${ev.isFree ? "#34d399" : "#f1f5f9"};">
+              ${escapeHtml(ev.priceLabel)}
+            </span>
+          </div>
+          <div style="font-size:12.5px;font-weight:700;line-height:1.3;color:#ffffff;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">
+            ${escapeHtml(ev.title)}
+          </div>
+          <div style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${escapeHtml(formatEventDate(ev.startsAt))} · ${escapeHtml(ev.venueName)}
+          </div>
+        </div>
+      `;
+      popup.setLngLat(coords).setHTML(html).addTo(map);
+    });
+
+    map.on("mouseleave", "event-pins", () => {
+      map.getCanvas().style.cursor = "";
+      popup.remove();
+    });
+
+    const ro = new ResizeObserver(() => {
+      map.resize();
+    });
+    ro.observe(containerRef.current);
 
     mapRef.current = map;
     return () => {
+      ro.disconnect();
+      popup.remove();
       map.remove();
       mapRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Switch active raster base layer instantly when mapTheme changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const themes: MapThemeId[] = ["voyager", "light", "dark", "osm"];
+    for (const t of themes) {
+      const layerId = `layer-${t}`;
+      if (map.getLayer(layerId)) {
+        map.setLayoutProperty(layerId, "visibility", t === mapTheme ? "visible" : "none");
+      }
+    }
+  }, [mapTheme]);
 
   // Update GeoJSON source whenever filtered events change.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const src = map.getSource("events") as GeoJSONSource | undefined;
-    if (src) {
-      src.setData(data as unknown as GeoJSON.FeatureCollection);
-    }
+    const applyData = () => {
+      const src = map.getSource("events") as GeoJSONSource | undefined;
+      if (src) {
+        src.setData(data as unknown as GeoJSON.FeatureCollection);
+      }
+    };
+    applyData();
+    map.once("load", applyData);
   }, [data]);
 
   // Highlight selected event pin.
@@ -263,6 +447,17 @@ export function MapView({
       ["==", ["get", "id"], selectedId ?? -1],
     ]);
   }, [selectedId]);
+
+  // Highlight hovered event pin from the sidebar list.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.getLayer("event-hovered-ring")) return;
+    map.setFilter("event-hovered-ring", [
+      "all",
+      ["!", ["has", "point_count"]],
+      ["==", ["get", "id"], hoveredId ?? -1],
+    ]);
+  }, [hoveredId]);
 
   // Fly to requested target.
   useEffect(() => {
@@ -287,7 +482,7 @@ export function MapView({
     if (!userMarkerRef.current) {
       const el = document.createElement("div");
       el.className =
-        "h-4 w-4 rounded-full bg-sky-500 ring-4 ring-sky-500/30 border-2 border-white shadow-md";
+        "h-4 w-4 rounded-full bg-sky-500 ring-4 ring-sky-500/35 border-2 border-white shadow-lg";
       userMarkerRef.current = new Marker({ element: el })
         .setLngLat([userLocation.lng, userLocation.lat])
         .addTo(map);
@@ -296,5 +491,22 @@ export function MapView({
     }
   }, [userLocation]);
 
-  return <div ref={containerRef} className="h-full w-full" />;
+  if (webglError) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 p-6 text-center dark:bg-slate-900">
+        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          Tu navegador tiene aceleración WebGL desactivada. Explorá el listado lateral de
+          actividades.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+      className="absolute inset-0 h-full w-full"
+    />
+  );
 }
