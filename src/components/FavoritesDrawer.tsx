@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { categoryById } from "@/lib/domain";
 import type { FavoriteItem } from "@/lib/favorites";
 import { formatEventDate } from "@/lib/format";
@@ -12,84 +13,69 @@ interface FavoritesDrawerProps {
   onRemove: (item: FavoriteItem) => void;
 }
 
-export function FavoritesDrawer({
-  open,
-  items,
-  onClose,
-  onSelect,
-  onRemove,
-}: FavoritesDrawerProps) {
+export function FavoritesDrawer({ open, items, onClose, onSelect, onRemove }: FavoritesDrawerProps) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/40 backdrop-blur-xs">
-      <div className="flex h-full w-full max-w-md flex-col bg-white shadow-2xl dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4 dark:border-slate-800">
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-label="Guardados"
+        onClick={(e) => e.stopPropagation()}
+        className="flex h-full w-full max-w-md flex-col border-l border-line bg-panel"
+      >
+        <header className="flex items-end justify-between px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
           <div>
-            <h2 className="text-base font-bold text-slate-900 dark:text-white">
-              ❤️ Mis planes favoritos
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              Guardados en este dispositivo ({items.length})
-            </p>
+            <h2 className="font-display text-3xl leading-none">Guardados</h2>
+            <p className="mt-1.5 font-mono text-[11px] text-muted">{items.length} en este dispositivo</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-            aria-label="Cerrar favoritos"
+            aria-label="Cerrar"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:text-fg"
           >
             ✕
           </button>
-        </div>
+        </header>
 
-        <div className="flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-slate-800">
+        <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto border-t border-line">
           {items.length === 0 ? (
-            <div className="p-8 text-center text-sm text-slate-500">
-              Todavía no guardaste actividades. Tocá &ldquo;🤍 Guardar&rdquo; en cualquier evento del
-              mapa para armar tu lista de planes.
-            </div>
+            <li className="px-5 py-12 text-center text-sm text-muted">
+              Tocá el marcador en cualquier actividad para guardarla acá.
+            </li>
           ) : (
             items.map((item) => {
               const cat = categoryById[item.category] ?? categoryById.arte;
               return (
-                <div
-                  key={item.id}
-                  className="flex items-start justify-between gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50"
-                >
-                  <button
-                    type="button"
-                    onClick={() => onSelect(item)}
-                    className="flex-1 text-left"
-                  >
-                    <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-                      <span>{cat.emoji}</span>
-                      <span>{cat.label}</span>
-                      <span>·</span>
-                      <span className="text-emerald-600 dark:text-emerald-400">
-                        {item.priceLabel}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">
-                      {item.title}
-                    </div>
-                    <div className="mt-0.5 text-xs text-slate-500">
+                <li key={item.id} className="flex items-start gap-3 px-5 py-4">
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: cat.color }} />
+                  <button type="button" onClick={() => onSelect(item)} className="min-w-0 flex-1 text-left">
+                    <span className="line-clamp-2 text-sm font-medium text-fg">{item.title}</span>
+                    <span className="mt-1 block truncate font-mono text-[11px] text-muted">
                       {formatEventDate(item.startsAt)} · {item.venueName}
-                    </div>
+                    </span>
                   </button>
                   <button
                     type="button"
                     onClick={() => onRemove(item)}
-                    className="rounded-lg p-1.5 text-xs text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                    aria-label="Eliminar de favoritos"
+                    aria-label="Quitar"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-fg"
                   >
                     ✕
                   </button>
-                </div>
+                </li>
               );
             })
           )}
-        </div>
+        </ul>
       </div>
     </div>
   );

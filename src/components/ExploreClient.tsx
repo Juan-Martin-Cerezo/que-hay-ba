@@ -2,56 +2,40 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CABA_ZONES, categoryById, type MapThemeId } from "@/lib/domain";
+import { CABA_ZONES, MAP_THEMES, categoryById, type MapThemeId } from "@/lib/domain";
 import { useFavorites, type FavoriteItem } from "@/lib/favorites";
 import { distanceKm, formatEventDate } from "@/lib/format";
 import { EventSheet } from "./EventSheet";
 import { FavoritesDrawer } from "./FavoritesDrawer";
-import { FilterBar, type FilterState } from "./FilterBar";
+import { EMPTY_FILTERS, FilterBar, type FilterState } from "./FilterBar";
 import { MapView, type EventsGeoJSON, type MapEventProperties } from "./MapView";
 
-const EMPTY_GEOJSON: EventsGeoJSON = {
-  type: "FeatureCollection",
-  total: 0,
-  features: [],
-};
+const EMPTY_GEOJSON: EventsGeoJSON = { type: "FeatureCollection", total: 0, features: [] };
 
 type SortMode = "upcoming" | "free" | "nearest";
+type Sheet = "peek" | "half" | "full";
+
+// Mobile bottom-sheet heights. Desktop ignores these (panel is a full-height column).
+const SHEET_HEIGHT: Record<Sheet, string> = { peek: "184px", half: "52dvh", full: "88dvh" };
+const NEXT_SHEET: Record<Sheet, Sheet> = { peek: "half", half: "full", full: "peek" };
 
 export function ExploreClient() {
-  const [filters, setFilters] = useState<FilterState>({
-    q: "",
-    when: "",
-    price: "",
-    categories: [],
-  });
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
   const [debouncedQ, setDebouncedQ] = useState("");
   const [data, setData] = useState<EventsGeoJSON>(EMPTY_GEOJSON);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [selected, setSelected] = useState<MapEventProperties | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
+  const [sheet, setSheet] = useState<Sheet>("peek");
   const [sortMode, setSortMode] = useState<SortMode>("upcoming");
-  const [activeZone, setActiveZone] = useState<string>("all");
-  const [mapTheme, setMapTheme] = useState<MapThemeId>("voyager");
+  const [activeZone, setActiveZone] = useState("all");
+  const [mapTheme, setMapTheme] = useState<MapThemeId>("dark");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [flyTarget, setFlyTarget] = useState<{
-    lat: number;
-    lng: number;
-    zoom?: number;
-    ts: number;
-  } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
 
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
-
-  // Open discovery sidebar by default on desktop screens
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
-      setListOpen(true);
-    }
-  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQ(filters.q.trim()), 220);
@@ -59,47 +43,44 @@ export function ExploreClient() {
   }, [filters.q]);
 
   const queryString = useMemo(() => {
-    const params = new URLSearchParams();
-    if (debouncedQ) params.set("q", debouncedQ);
-    if (filters.when) params.set("when", filters.when);
-    if (filters.price) params.set("price", filters.price);
-    if (filters.categories.length > 0) params.set("cat", filters.categories.join(","));
-    return params.toString();
+    const p = new URLSearchParams();
+    if (debouncedQ) p.set("q", debouncedQ);
+    if (filters.when) p.set("when", filters.when);
+    if (filters.price) p.set("price", filters.price);
+    if (filters.categories.length) p.set("cat", filters.categories.join(","));
+    return p.toString();
   }, [debouncedQ, filters.when, filters.price, filters.categories]);
 
   const loading = loadedKey !== queryString;
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch(`/api/events?${queryString}`, { signal: controller.signal })
+    const ctrl = new AbortController();
+    fetch(`/api/events?${queryString}`, { signal: ctrl.signal })
       .then((r) => r.json())
       .then((d: EventsGeoJSON) => {
-        if (!controller.signal.aborted && d?.features) {
+        if (!ctrl.signal.aborted && d?.features) {
           setData(d);
           setLoadedKey(queryString);
         }
       })
       .catch(() => {
-        if (!controller.signal.aborted) setLoadedKey(queryString);
+        if (!ctrl.signal.aborted) setLoadedKey(queryString);
       });
-
-    return () => controller.abort();
+    return () => ctrl.abort();
   }, [queryString]);
 
-  const handleSelectEvent = useCallback((ev: MapEventProperties) => {
+  const selectEvent = useCallback((ev: MapEventProperties) => {
     setSelected(ev);
-    setFlyTarget({ lat: ev.lat, lng: ev.lng, zoom: 15.8, ts: Date.now() });
-    if (typeof window !== "undefined" && window.innerWidth < 640) {
-      setListOpen(false);
-    }
+    setFlyTarget({ lat: ev.lat, lng: ev.lng, zoom: 15.6, ts: Date.now() });
+    setSheet("peek");
   }, []);
 
-  const handleSelectZone = useCallback((zone: (typeof CABA_ZONES)[number]) => {
-    setActiveZone(zone.id);
-    setFlyTarget({ lat: zone.lat, lng: zone.lng, zoom: zone.zoom, ts: Date.now() });
+  const selectZone = useCallback((z: (typeof CABA_ZONES)[number]) => {
+    setActiveZone(z.id);
+    setFlyTarget({ lat: z.lat, lng: z.lng, zoom: z.zoom, ts: Date.now() });
   }, []);
 
-  const handleLocateUser = useCallback(() => {
+  const locate = useCallback(() => {
     if (!("geolocation" in navigator)) return;
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
@@ -107,63 +88,54 @@ export function ExploreClient() {
         const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         setUserLocation(loc);
         setSortMode("nearest");
-        setFlyTarget({ lat: loc.lat, lng: loc.lng, zoom: 14.5, ts: Date.now() });
+        setFlyTarget({ ...loc, zoom: 14.5, ts: Date.now() });
         setLocating(false);
       },
-      () => {
-        setLocating(false);
-      },
+      () => setLocating(false),
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, []);
 
-  const sortedEvents = useMemo(() => {
+  const events = useMemo(() => {
     const list = data.features.map((f) => f.properties);
     if (sortMode === "nearest" && userLocation) {
-      return [...list]
-        .sort(
-          (a, b) =>
-            distanceKm(userLocation.lat, userLocation.lng, a.lat, a.lng) -
-            distanceKm(userLocation.lat, userLocation.lng, b.lat, b.lng)
-        )
-        .slice(0, 100);
+      const d = (e: MapEventProperties) => distanceKm(userLocation.lat, userLocation.lng, e.lat, e.lng);
+      return [...list].sort((a, b) => d(a) - d(b)).slice(0, 120);
     }
-    if (sortMode === "free") {
-      return [...list]
-        .sort((a, b) => Number(b.isFree) - Number(a.isFree))
-        .slice(0, 100);
-    }
-    return list.slice(0, 100);
+    if (sortMode === "free") return [...list].sort((a, b) => Number(b.isFree) - Number(a.isFree)).slice(0, 120);
+    return list.slice(0, 120);
   }, [data.features, sortMode, userLocation]);
 
-  const handleSelectFavorite = useCallback(
+  const siblings = useMemo(() => {
+    if (!selected) return [];
+    const key = `${selected.lat.toFixed(4)},${selected.lng.toFixed(4)}`;
+    return data.features
+      .map((f) => f.properties)
+      .filter((e) => `${e.lat.toFixed(4)},${e.lng.toFixed(4)}` === key);
+  }, [data.features, selected]);
+
+  const selectFavorite = useCallback(
     (item: FavoriteItem) => {
       setFavoritesOpen(false);
       const existing = data.features.find((f) => f.properties.id === item.id)?.properties;
-      if (existing) {
-        handleSelectEvent(existing);
-      } else {
-        setFlyTarget({ lat: item.lat, lng: item.lng, zoom: 15.8, ts: Date.now() });
-        fetch(`/api/events/${item.id}`)
-          .then((r) => (r.ok ? r.json() : null))
-          .then((ev) => {
-            if (ev) setSelected(ev);
-          })
-          .catch(() => {});
-      }
+      if (existing) return selectEvent(existing);
+      setFlyTarget({ lat: item.lat, lng: item.lng, zoom: 15.6, ts: Date.now() });
+      fetch(`/api/events/${item.id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((ev) => ev && setSelected(ev))
+        .catch(() => {});
     },
-    [data.features, handleSelectEvent]
+    [data.features, selectEvent]
   );
 
-  const cycleMapTheme = () => {
-    const order: MapThemeId[] = ["voyager", "osm", "dark", "light"];
-    const next = order[(order.indexOf(mapTheme) + 1) % order.length];
-    setMapTheme(next);
+  const cycleTheme = () => {
+    const i = MAP_THEMES.findIndex((t) => t.id === mapTheme);
+    setMapTheme(MAP_THEMES[(i + 1) % MAP_THEMES.length].id);
   };
+  const themeLabel = MAP_THEMES.find((t) => t.id === mapTheme)?.label ?? "";
 
   return (
-    <main className="relative h-dvh w-screen overflow-hidden bg-[#f6f3ec] select-none dark:bg-[#080b12]">
-      {/* Interactive Full-Viewport Map with Custom Category Icon Pins */}
+    <main className="relative h-dvh w-screen overflow-hidden bg-ink text-fg">
       <MapView
         data={data}
         selectedId={selected?.id ?? null}
@@ -171,254 +143,155 @@ export function ExploreClient() {
         mapTheme={mapTheme}
         userLocation={userLocation}
         flyTarget={flyTarget}
-        onSelectEvent={handleSelectEvent}
+        onSelectEvent={selectEvent}
       />
 
-      {/* Top Editorial Command Bar */}
-      <FilterBar
-        filters={filters}
-        total={data.total}
-        loading={loading}
-        favoritesCount={favorites.length}
-        locating={locating}
-        hasUserLocation={Boolean(userLocation)}
-        activeZone={activeZone}
-        mapTheme={mapTheme}
-        onChange={setFilters}
-        onSelectZone={handleSelectZone}
-        onChangeTheme={setMapTheme}
-        onOpenFavorites={() => setFavoritesOpen(true)}
-        onLocateUser={handleLocateUser}
-      />
+      {/* Floating map tools — top right on every breakpoint */}
+      <div className="pointer-events-none absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-10 flex gap-2 lg:right-16">
+        <ToolButton onClick={cycleTheme} label={`Capa: ${themeLabel}`}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+            <path d="m12 3 9 5-9 5-9-5 9-5Z" />
+            <path d="m3 13 9 5 9-5" />
+          </svg>
+          <span className="hidden sm:inline">{themeLabel}</span>
+        </ToolButton>
+        <ToolButton onClick={locate} label="Mi ubicación" active={Boolean(userLocation)}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+          </svg>
+        </ToolButton>
+      </div>
 
-      {/* Collapsible Editorial Cartelera Sidebar (Desktop Left Panel / Mobile Bottom Sheet) */}
-      {listOpen && (
-        <section
-          aria-label="Cartelera de experiencias"
-          className="fixed bottom-16 left-2.5 right-2.5 z-20 flex max-h-[58dvh] flex-col overflow-hidden rounded-3xl border border-slate-900/14 bg-[#fcfaf5]/96 shadow-2xl backdrop-blur-xl sm:bottom-16 sm:left-3.5 sm:right-auto sm:top-29 sm:max-h-none sm:w-[385px] dark:border-white/14 dark:bg-[#0b0f19]/96"
+      {/* Panel: bottom sheet on mobile/tablet, fixed left column on desktop */}
+      <section
+        aria-label="Actividades"
+        style={{ ["--sheet-h" as string]: SHEET_HEIGHT[sheet] }}
+        className="absolute inset-x-0 bottom-0 z-20 flex h-[var(--sheet-h)] flex-col rounded-t-3xl border-t border-line bg-panel/95 shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.8)] backdrop-blur-xl transition-[height] duration-300 ease-out sm:inset-x-3 sm:bottom-3 sm:rounded-3xl sm:border md:left-3 md:right-auto md:w-[400px] lg:top-3 lg:h-auto lg:w-[380px]"
+      >
+        {/* Drag handle (mobile/tablet only) */}
+        <button
+          type="button"
+          onClick={() => setSheet((s) => NEXT_SHEET[s])}
+          aria-label={sheet === "full" ? "Contraer listado" : "Expandir listado"}
+          className="flex w-full shrink-0 justify-center pb-1 pt-2.5 lg:hidden"
         >
-          {/* Quick Barrio Jump Strip inside panel */}
-          <div className="flex items-center gap-1 overflow-x-auto border-b border-slate-900/10 bg-slate-900/[0.03] px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-white/10 dark:bg-white/[0.03]">
-            {CABA_ZONES.map((z) => {
-              const active = activeZone === z.id;
-              return (
-                <button
-                  key={z.id}
-                  type="button"
-                  onClick={() => handleSelectZone(z)}
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
-                    active
-                      ? "bg-slate-950 text-white shadow-xs dark:bg-rose-600"
-                      : "bg-white/90 text-slate-700 hover:bg-white hover:text-slate-950 dark:bg-slate-800/80 dark:text-slate-300"
-                  }`}
-                >
-                  {z.label}
-                </button>
-              );
-            })}
-          </div>
+          <span className="h-1 w-9 rounded-full bg-white/20" />
+        </button>
 
-          {/* Panel Header + Sort Tabs */}
-          <div className="flex items-center justify-between border-b border-slate-900/10 px-3.5 py-2.5 dark:border-white/10">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setSortMode("upcoming")}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
-                  sortMode === "upcoming"
-                    ? "bg-slate-950 text-white dark:bg-amber-400 dark:text-slate-950"
-                    : "text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800"
-                }`}
-              >
-                Próximos
-              </button>
-              <button
-                type="button"
-                onClick={() => setSortMode("free")}
-                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
-                  sortMode === "free"
-                    ? "bg-emerald-600 text-white"
-                    : "text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800"
-                }`}
-              >
-                $0 Gratis primero
-              </button>
-              {userLocation && (
-                <button
-                  type="button"
-                  onClick={() => setSortMode("nearest")}
-                  className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition ${
-                    sortMode === "nearest"
-                      ? "bg-rose-600 text-white"
-                      : "text-slate-500 hover:bg-slate-200/60 dark:text-slate-400 dark:hover:bg-slate-800"
-                  }`}
-                >
-                  Cerca mío
-                </button>
-              )}
+        <header className="shrink-0 space-y-3 px-4 pb-3 lg:pt-5">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h1 className="font-display text-[26px] leading-none tracking-tight">
+                Qué hay <em className="text-accent">BA</em>
+              </h1>
+              <p className="mt-1.5 font-mono text-[11px] text-muted" aria-live="polite">
+                {loading ? "Actualizando…" : `${data.total.toLocaleString("es-AR")} actividades`}
+              </p>
             </div>
-
             <button
               type="button"
-              onClick={() => setListOpen(false)}
-              className="flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-slate-400 hover:bg-slate-200/70 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-white"
-              aria-label="Cerrar cartelera"
+              onClick={() => setFavoritesOpen(true)}
+              className="flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-medium text-muted transition-colors hover:text-fg"
             >
-              ✕
+              <svg viewBox="0 0 24 24" fill={favorites.length ? "#f5b84a" : "none"} stroke={favorites.length ? "#f5b84a" : "currentColor"} strokeWidth="1.8" className="h-3.5 w-3.5">
+                <path d="M6 3h12v18l-6-4-6 4V3Z" />
+              </svg>
+              <span className="font-mono">{favorites.length}</span>
             </button>
           </div>
 
-          {/* Scrollable Editorial Ticket Cards */}
-          <div className="flex-1 divide-y divide-dashed divide-slate-900/12 overflow-y-auto dark:divide-white/12">
-            {sortedEvents.length === 0 ? (
-              <div className="flex flex-col items-center justify-center gap-2.5 p-8 text-center">
-                <span className="text-3xl">🎭</span>
-                <p className="font-display text-sm font-bold text-slate-800 dark:text-slate-100">
-                  Sin funciones para este filtro
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setFilters({ q: "", when: "", price: "", categories: [] })
-                  }
-                  className="rounded-xl bg-slate-950 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-rose-600"
-                >
-                  Restablecer cartelera
-                </button>
-              </div>
-            ) : (
-              sortedEvents.map((ev) => {
-                const cat = categoryById[ev.category] ?? categoryById.arte;
-                const dist =
-                  userLocation != null
-                    ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng)
-                    : null;
-                const isSelected = selected?.id === ev.id;
-                return (
+          <FilterBar
+            filters={filters}
+            activeZone={activeZone}
+            onChange={setFilters}
+            onSelectZone={selectZone}
+            onFocusSearch={() => setSheet((s) => (s === "peek" ? "half" : s))}
+          />
+        </header>
+
+        {/* Sort tabs */}
+        <div className="flex shrink-0 items-center gap-4 border-y border-line px-4 py-2.5 text-xs">
+          {(
+            [
+              ["upcoming", "Próximos"],
+              ["free", "Gratis primero"],
+              ...(userLocation ? ([["nearest", "Cerca"]] as const) : []),
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setSortMode(id)}
+              className={`font-medium transition-colors ${sortMode === id ? "text-fg" : "text-muted hover:text-fg"}`}
+            >
+              {label}
+              {sortMode === id && <span className="mt-1 block h-px bg-accent" />}
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
+        <ul className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
+          {events.length === 0 && !loading ? (
+            <li className="px-6 py-12 text-center">
+              <p className="font-display text-xl">Nada por acá.</p>
+              <p className="mt-1 text-xs text-muted">Probá con menos filtros.</p>
+              <button
+                type="button"
+                onClick={() => setFilters(EMPTY_FILTERS)}
+                className="mt-4 rounded-full bg-fg px-4 py-2 text-xs font-semibold text-ink"
+              >
+                Ver todo
+              </button>
+            </li>
+          ) : (
+            events.map((ev) => {
+              const cat = categoryById[ev.category] ?? categoryById.arte;
+              const dist = userLocation ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng) : null;
+              const on = selected?.id === ev.id;
+              return (
+                <li key={ev.id}>
                   <button
-                    key={ev.id}
                     type="button"
                     onMouseEnter={() => setHoveredId(ev.id)}
                     onMouseLeave={() => setHoveredId(null)}
-                    onClick={() => handleSelectEvent(ev)}
-                    className={`group flex w-full items-start gap-3 p-3.5 text-left transition ${
-                      isSelected
-                        ? "bg-amber-500/12 dark:bg-rose-500/15"
-                        : "hover:bg-slate-900/[0.04] dark:hover:bg-white/[0.04]"
-                    }`}
+                    onClick={() => selectEvent(ev)}
+                    className={`group flex w-full gap-3 px-4 py-3.5 text-left transition-colors ${on ? "bg-accent/10" : "hover:bg-white/[0.03]"}`}
                   >
-                    {/* Pin-matching Category Icon Medallion */}
-                    <div className="relative mt-0.5 shrink-0">
-                      <div
-                        className="flex h-10 w-10 items-center justify-center rounded-2xl border-2 border-white text-base text-white shadow-md transition group-hover:scale-105 dark:border-slate-800"
-                        style={{ backgroundColor: cat.color }}
-                      >
-                        {cat.emoji}
-                      </div>
-                      {ev.isFree && (
-                        <span className="font-mono-tabular absolute -right-1.5 -top-1.5 rounded-full border border-white bg-emerald-500 px-1 text-[8px] font-black text-white shadow-xs">
-                          $0
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-mono-tabular truncate text-[11px] font-semibold uppercase tracking-tight text-slate-500 dark:text-slate-400">
-                          {formatEventDate(ev.startsAt)}
-                        </span>
-                        <span
-                          className={`font-mono-tabular shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-extrabold ${
-                            ev.isFree
-                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                              : "bg-slate-900/8 text-slate-800 dark:bg-white/10 dark:text-slate-200"
-                          }`}
-                        >
-                          {ev.priceLabel}
-                        </span>
-                      </div>
-                      <div className="font-display mt-0.5 line-clamp-1 text-[13.5px] font-bold leading-snug text-slate-950 group-hover:text-rose-600 dark:text-white dark:group-hover:text-amber-300">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: cat.color }} />
+                    <span className="min-w-0 flex-1">
+                      <span className={`line-clamp-2 text-sm font-medium leading-snug ${on ? "text-accent" : "text-fg"}`}>
                         {ev.title}
-                      </div>
-                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-600 dark:text-slate-400">
-                        📍 {ev.venueName}
+                      </span>
+                      <span className="mt-1 block truncate text-xs text-muted">
+                        {ev.venueName}
                         {ev.barrio ? ` · ${ev.barrio}` : ""}
-                        {dist != null ? ` · ${dist.toFixed(1)} km` : ""}
-                      </div>
-                    </div>
+                      </span>
+                      <span className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[11px]">
+                        <span className="truncate text-muted">
+                          {formatEventDate(ev.startsAt)}
+                          {dist != null ? ` · ${dist.toFixed(1)} km` : ""}
+                        </span>
+                        <span className={`shrink-0 ${ev.isFree ? "text-emerald-400" : "text-fg/80"}`}>{ev.priceLabel}</span>
+                      </span>
+                    </span>
                   </button>
-                );
-              })
-            )}
-          </div>
-        </section>
-      )}
+                </li>
+              );
+            })
+          )}
+          <li className="px-4 py-5 text-center">
+            <Link href="/acerca" className="font-mono text-[11px] text-muted hover:text-fg">
+              Fuentes y metodología →
+            </Link>
+          </li>
+        </ul>
+      </section>
 
-      {/* Bottom Floating Cartographic Control Dock */}
-      <div className="pointer-events-none absolute bottom-3.5 left-2.5 right-14 z-20 flex flex-wrap items-center gap-2 sm:left-3.5">
-        <button
-          type="button"
-          onClick={() => setListOpen((v) => !v)}
-          className="pointer-events-auto flex items-center gap-2 rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-4 py-2 text-xs font-extrabold text-slate-950 shadow-xl backdrop-blur-xl transition hover:scale-[1.02] hover:bg-white dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-white"
-        >
-          <span>{listOpen ? "🗺️ Ocultar cartelera" : "🎟️ Cartelera lateral"}</span>
-          <span className="font-mono-tabular rounded-full bg-slate-950 px-2 py-0.5 text-[10px] font-extrabold text-white dark:bg-rose-600">
-            {data.total}
-          </span>
-        </button>
-
-        {/* Quick 1-Click Map Style Toggle */}
-        <button
-          type="button"
-          onClick={cycleMapTheme}
-          className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-3.5 py-2 text-xs font-bold text-slate-800 shadow-xl backdrop-blur-xl transition hover:bg-white dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-slate-200"
-          title="Cambiar capa cartográfica"
-        >
-          <span>🗺️</span>
-          <span>
-            {mapTheme === "voyager"
-              ? "Capa: Urbano CABA"
-              : mapTheme === "osm"
-                ? "Capa: GCBA + Subte"
-                : mapTheme === "dark"
-                  ? "Capa: Nocturno"
-                  : "Capa: Callejero"}
-          </span>
-        </button>
-
-        {/* Re-center CABA button */}
-        <button
-          type="button"
-          onClick={() => handleSelectZone(CABA_ZONES[0])}
-          className="pointer-events-auto hidden items-center gap-1 rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-3 py-2 text-xs font-bold text-slate-800 shadow-xl backdrop-blur-xl transition hover:bg-white sm:flex dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-slate-200"
-          title="Centrar vista en toda la Ciudad de Buenos Aires"
-        >
-          <span>🎯</span>
-          <span>Vista CABA</span>
-        </button>
-
-        <Link
-          href="/acerca"
-          className="pointer-events-auto rounded-full border border-slate-900/15 bg-[#fcfaf5]/96 px-3 py-2 text-xs font-bold text-slate-700 shadow-xl backdrop-blur-xl transition hover:text-slate-950 dark:border-white/15 dark:bg-[#0b0f19]/96 dark:text-slate-300"
-        >
-          Proyecto y Fuentes
-        </Link>
-      </div>
-
-      {/* Selected Event Sheet */}
       <EventSheet
         event={selected}
-        siblingEvents={
-          selected
-            ? data.features
-                .map((f) => f.properties)
-                .filter(
-                  (e) =>
-                    e.lat.toFixed(4) === selected.lat.toFixed(4) &&
-                    e.lng.toFixed(4) === selected.lng.toFixed(4)
-                )
-            : []
-        }
+        siblingEvents={siblings}
         isFavorite={selected ? isFavorite(selected.id) : false}
         userLocation={userLocation}
         onClose={() => setSelected(null)}
@@ -426,14 +299,39 @@ export function ExploreClient() {
         onToggleFavorite={toggleFavorite}
       />
 
-      {/* Saved Favourites Drawer */}
       <FavoritesDrawer
         open={favoritesOpen}
         items={favorites}
         onClose={() => setFavoritesOpen(false)}
-        onSelect={handleSelectFavorite}
+        onSelect={selectFavorite}
         onRemove={toggleFavorite}
       />
     </main>
+  );
+}
+
+function ToolButton({
+  children,
+  onClick,
+  label,
+  active,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className={`pointer-events-auto flex h-10 min-w-10 items-center justify-center gap-2 rounded-full border px-3 text-xs font-medium shadow-[0_8px_24px_-8px_rgba(0,0,0,0.7)] backdrop-blur-xl transition-colors ${
+        active ? "border-sky-400/60 bg-sky-400/15 text-sky-300" : "border-line bg-panel/90 text-fg hover:bg-raised"
+      }`}
+    >
+      {children}
+    </button>
   );
 }

@@ -7,7 +7,6 @@ import { distanceKm, formatEventDate, formatEventLongDate } from "@/lib/format";
 import type { MapEventProperties } from "./MapView";
 
 interface EventDetail extends MapEventProperties {
-  sources?: Array<{ source: string; url: string }>;
   upcomingSchedule?: Array<{ id: number; startsAt: string }>;
 }
 
@@ -21,18 +20,17 @@ interface EventSheetProps {
   onToggleFavorite: (item: FavoriteItem) => void;
 }
 
-function buildGoogleCalendarUrl(ev: MapEventProperties): string {
+function calendarUrl(ev: MapEventProperties): string {
   const start = new Date(ev.startsAt);
   const end = ev.endsAt ? new Date(ev.endsAt) : new Date(start.getTime() + 2 * 3600_000);
   const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
-  const params = new URLSearchParams({
+  return `https://calendar.google.com/calendar/render?${new URLSearchParams({
     action: "TEMPLATE",
     text: ev.title,
     dates: `${fmt(start)}/${fmt(end)}`,
-    details: `${ev.description ? `${ev.description.slice(0, 300)}\n\n` : ""}Más info: ${ev.url}`,
+    details: `${ev.description ? `${ev.description.slice(0, 300)}\n\n` : ""}${ev.url}`,
     location: [ev.venueName, ev.address, ev.barrio, "Buenos Aires"].filter(Boolean).join(", "),
-  });
-  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+  })}`;
 }
 
 export function EventSheet({
@@ -55,280 +53,206 @@ export function EventSheet({
     let cancelled = false;
     fetch(`/api/events/${event.id}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d: EventDetail | null) => {
-        if (!cancelled && d) setDetail(d);
-      })
+      .then((d: EventDetail | null) => !cancelled && d && setDetail(d))
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [event]);
 
-  if (!event) return null;
-  const current = detail && detail.id === event.id ? detail : event;
-  const cat = categoryById[current.category] ?? categoryById.arte;
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${current.lat},${current.lng}&travelmode=transit`;
-  const calendarUrl = buildGoogleCalendarUrl(current);
-  const dist =
-    userLocation != null
-      ? distanceKm(userLocation.lat, userLocation.lng, current.lat, current.lng)
-      : null;
+  useEffect(() => {
+    if (!event) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [event, onClose]);
 
-  const handleShare = async () => {
-    const shareText = `${current.title} en ${current.venueName} (${current.priceLabel})`;
-    const shareUrl = current.url || window.location.href;
+  if (!event) return null;
+  const ev = detail && detail.id === event.id ? detail : event;
+  const cat = categoryById[ev.category] ?? categoryById.arte;
+  const dist = userLocation ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng) : null;
+
+  const share = async () => {
+    const text = `${ev.title} — ${ev.venueName}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: current.title, text: shareText, url: shareUrl });
+        await navigator.share({ title: ev.title, text, url: ev.url });
         return;
       } catch {
-        // Fallback to clipboard
+        /* fall through to clipboard */
       }
     }
     try {
-      await navigator.clipboard.writeText(`${shareText} — ${shareUrl}`);
+      await navigator.clipboard.writeText(`${text} ${ev.url}`);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2200);
+      setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Ignore clipboard error
+      /* ignore */
     }
+  };
+
+  const fav: FavoriteItem = {
+    id: ev.id,
+    title: ev.title,
+    category: ev.category,
+    priceLabel: ev.priceLabel,
+    startsAt: ev.startsAt,
+    venueName: ev.venueName,
+    barrio: ev.barrio,
+    url: ev.url,
+    lat: ev.lat,
+    lng: ev.lng,
   };
 
   return (
     <aside
-      aria-label="Ficha del evento"
-      className="fixed inset-x-0 bottom-0 z-30 flex max-h-[84dvh] flex-col overflow-hidden rounded-t-3xl border border-slate-900/15 bg-[#fcfaf5]/98 shadow-2xl backdrop-blur-xl sm:inset-x-auto sm:bottom-4 sm:right-4 sm:top-29 sm:max-h-[calc(100dvh-8.5rem)] sm:w-[415px] sm:rounded-3xl dark:border-white/15 dark:bg-[#0b0f19]/98"
+      role="dialog"
+      aria-label={ev.title}
+      className="fixed inset-x-0 bottom-0 z-30 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-3xl border-t border-line bg-panel shadow-[0_-20px_60px_-12px_rgba(0,0,0,0.9)] sm:inset-x-auto sm:bottom-3 sm:right-3 sm:top-3 sm:max-h-none sm:w-[400px] sm:rounded-3xl sm:border"
     >
-      {/* Mobile drag handle */}
-      <div className="flex justify-center pb-1 pt-2 sm:hidden">
-        <span className="h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-700" />
-      </div>
-
-      {/* Hero Banner */}
-      <div className="relative h-44 w-full shrink-0 overflow-hidden bg-slate-950 sm:h-48">
-        {current.imageUrl && !imgFailed ? (
+      {/* Media */}
+      <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-raised">
+        {ev.imageUrl && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={current.imageUrl}
-            alt={current.title}
-            onError={() => setImgFailed(true)}
-            className="h-full w-full object-cover"
-            loading="lazy"
-          />
+          <img src={ev.imageUrl} alt="" onError={() => setImgFailed(true)} className="h-full w-full object-cover" />
         ) : (
           <div
-            className="flex h-full w-full flex-col items-center justify-center gap-1.5"
-            style={{
-              background: `radial-gradient(circle at 25% 20%, ${cat.color}ee, #090d16 85%)`,
-            }}
+            className="flex h-full w-full items-end p-5"
+            style={{ background: `radial-gradient(120% 90% at 0% 0%, ${cat.color}55, transparent 60%), #18181b` }}
           >
-            <span className="text-5xl drop-shadow">{cat.emoji}</span>
-            <span className="font-mono-tabular text-[10px] font-bold uppercase tracking-widest text-white/80">
-              {cat.label}
-            </span>
+            <span className="font-display text-4xl italic text-white/80">{cat.label}</span>
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/30 to-transparent" />
-
-        {/* Top floating controls */}
-        <div className="absolute inset-x-3 top-3 flex items-center justify-between">
-          <span className="font-mono-tabular rounded-full border border-white/15 bg-black/60 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white/95 backdrop-blur-md">
-            {SOURCE_LABELS[current.source] ?? current.source}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleShare}
-              aria-label="Compartir evento"
-              className="flex h-8 items-center gap-1 rounded-full border border-white/15 bg-black/60 px-3 text-xs font-bold text-white backdrop-blur-md transition hover:bg-black/80"
-            >
-              <span>{copied ? "✓ Copiado" : "↗ Compartir"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Cerrar ficha"
-              className="flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/60 text-sm font-bold text-white backdrop-blur-md transition hover:bg-black/80"
-            >
-              ✕
-            </button>
-          </div>
-        </div>
-
-        {/* Bottom badges on hero */}
-        <div className="absolute bottom-3 left-4 right-4 flex flex-wrap items-center justify-between gap-2">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1 text-xs font-bold text-white shadow-lg"
-            style={{ backgroundColor: cat.color }}
+        <div className="absolute inset-0 bg-gradient-to-t from-panel via-transparent to-black/30" />
+        <div className="absolute inset-x-3 top-3 flex justify-between">
+          <button
+            type="button"
+            onClick={share}
+            className="h-9 rounded-full bg-black/55 px-3.5 text-xs font-medium text-white backdrop-blur-md hover:bg-black/75"
           >
-            <span>{cat.emoji}</span>
-            <span>{cat.label}</span>
-          </span>
-          <span
-            className={`font-mono-tabular rounded-full px-3 py-1 text-xs font-extrabold shadow-lg ${
-              current.isFree
-                ? "bg-emerald-500 text-white"
-                : "bg-[#fcfaf5] text-slate-950"
-            }`}
+            {copied ? "Copiado" : "Compartir"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Cerrar"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-md hover:bg-black/75"
           >
-            {current.priceLabel}
-          </span>
+            ✕
+          </button>
         </div>
       </div>
 
-      {/* Co-located experiences switcher ("en la misma ubicación") */}
-      {siblingEvents.length > 1 && (
-        <div className="border-b border-slate-900/10 bg-amber-500/10 px-3.5 py-2 dark:border-white/10 dark:bg-amber-500/15">
-          <p className="font-mono-tabular mb-1.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900 dark:text-amber-300">
-            📍 {siblingEvents.length} experiencias en esta misma ubicación ({current.venueName})
-          </p>
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {siblingEvents.map((sib) => {
-              const sibCat = categoryById[sib.category] ?? categoryById.arte;
-              const active = sib.id === current.id;
-              return (
-                <button
-                  key={sib.id}
-                  type="button"
-                  onClick={() => onSelectSibling(sib)}
-                  className={`flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold transition ${
-                    active
-                      ? "border-slate-950 bg-slate-950 text-white dark:border-rose-500 dark:bg-rose-600"
-                      : "border-slate-900/15 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-900 dark:text-slate-200"
-                  }`}
-                >
-                  <span>{sibCat.emoji}</span>
-                  <span className="max-w-[140px] truncate">{sib.title}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Scrollable Body */}
-      <div className="flex-1 space-y-3.5 overflow-y-auto p-4 text-sm">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="font-display text-lg font-extrabold leading-snug text-slate-950 sm:text-xl dark:text-white">
-            {current.title}
-          </h2>
-          <button
-            type="button"
-            onClick={() =>
-              onToggleFavorite({
-                id: current.id,
-                title: current.title,
-                category: current.category,
-                priceLabel: current.priceLabel,
-                startsAt: current.startsAt,
-                venueName: current.venueName,
-                barrio: current.barrio,
-                url: current.url,
-                lat: current.lat,
-                lng: current.lng,
-              })
-            }
-            aria-label={isFavorite ? "Quitar de favoritos" : "Guardar en favoritos"}
-            className={`shrink-0 rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
-              isFavorite
-                ? "border-rose-400 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                : "border-slate-900/12 bg-white text-slate-800 hover:bg-slate-100 dark:border-white/12 dark:bg-slate-800 dark:text-slate-200"
-            }`}
-          >
-            {isFavorite ? "❤️ En mi agenda" : "🤍 Guardar"}
-          </button>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pb-5">
+        {/* Meta */}
+        <div className="flex items-center gap-2 font-mono text-[11px] text-muted">
+          <span className="h-2 w-2 rounded-full" style={{ background: cat.color }} />
+          <span>{cat.shortLabel}</span>
+          <span>·</span>
+          <span className={ev.isFree ? "text-emerald-400" : "text-fg"}>{ev.priceLabel}</span>
         </div>
 
-        {/* Editorial Ticket Stub: Date, Time & Venue */}
-        <div className="space-y-2.5 rounded-2xl border border-dashed border-slate-900/20 bg-white/80 p-3.5 text-xs text-slate-700 dark:border-white/20 dark:bg-slate-900/70 dark:text-slate-200">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 font-bold text-slate-950 dark:text-white">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300">
-                🗓️
-              </span>
-              <span className="font-mono-tabular capitalize">
-                {formatEventLongDate(current.startsAt)} hs
-              </span>
-            </div>
+        <h2 className="mt-2 font-display text-[28px] leading-[1.08] tracking-tight text-fg">{ev.title}</h2>
+
+        {/* Facts */}
+        <dl className="mt-5 divide-y divide-line border-y border-line text-sm">
+          <div className="flex items-start justify-between gap-3 py-3">
+            <dt className="sr-only">Fecha</dt>
+            <dd className="capitalize text-fg">{formatEventLongDate(ev.startsAt)} hs</dd>
             <a
-              href={calendarUrl}
+              href={calendarUrl(ev)}
               target="_blank"
               rel="noopener noreferrer"
-              className="shrink-0 rounded-lg border border-slate-900/15 bg-[#fcfaf5] px-2.5 py-1 text-[11px] font-bold text-slate-800 hover:bg-slate-100 dark:border-white/15 dark:bg-slate-800 dark:text-slate-200"
+              className="shrink-0 font-mono text-[11px] text-accent hover:underline"
             >
-              + Google Calendar
+              + Agendar
             </a>
           </div>
-
-          <div className="flex items-start gap-2 border-t border-dashed border-slate-900/15 pt-2.5 dark:border-white/15">
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400">
-              📍
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="font-bold text-slate-950 dark:text-white">{current.venueName}</div>
-              <div className="mt-0.5 text-slate-500 dark:text-slate-400">
-                {[current.address, current.barrio, "CABA"].filter(Boolean).join(" · ")}
-                {dist != null && (
-                  <span className="font-mono-tabular ml-1.5 inline-block rounded-md bg-emerald-500/15 px-1.5 py-0.2 font-bold text-emerald-700 dark:text-emerald-300">
-                    a {dist.toFixed(1)} km
-                  </span>
-                )}
-              </div>
-            </div>
+          <div className="py-3">
+            <dt className="sr-only">Lugar</dt>
+            <dd className="text-fg">{ev.venueName}</dd>
+            <dd className="mt-0.5 text-xs text-muted">
+              {[ev.address, ev.barrio].filter(Boolean).join(" · ")}
+              {dist != null && <span className="font-mono"> · {dist.toFixed(1)} km</span>}
+            </dd>
           </div>
-        </div>
+        </dl>
 
-        {/* Upcoming schedule pills when show repeats */}
+        {/* Same venue */}
+        {siblingEvents.length > 1 && (
+          <section className="mt-5">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+              También en este lugar · {siblingEvents.length}
+            </p>
+            <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5">
+              {siblingEvents.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onSelectSibling(s)}
+                  className={`max-w-[200px] shrink-0 truncate rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                    s.id === ev.id ? "border-accent text-accent" : "border-line text-muted hover:text-fg"
+                  }`}
+                >
+                  {s.title}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {detail?.upcomingSchedule && detail.upcomingSchedule.length > 1 && (
-          <div>
-            <p className="font-mono-tabular mb-1.5 text-[10.5px] font-bold uppercase tracking-widest text-slate-400">
-              Próximas funciones ({detail.upcomingSchedule.length})
+          <section className="mt-5">
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">
+              Funciones · {detail.upcomingSchedule.length}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {detail.upcomingSchedule.slice(0, 8).map((slot) => (
-                <span
-                  key={slot.id}
-                  className="font-mono-tabular rounded-lg border border-slate-900/10 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 dark:border-white/10 dark:bg-slate-800 dark:text-slate-300"
-                >
-                  {formatEventDate(slot.startsAt)}
+              {detail.upcomingSchedule.slice(0, 8).map((s) => (
+                <span key={s.id} className="rounded-md bg-raised px-2 py-1 font-mono text-[11px] text-fg/80">
+                  {formatEventDate(s.startsAt)}
                 </span>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Synopsis / Description */}
-        {current.description && (
-          <div className="space-y-1">
-            <p className="font-mono-tabular text-[10.5px] font-bold uppercase tracking-widest text-slate-400">
-              Reseña y detalles
-            </p>
-            <p className="whitespace-pre-line text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-              {current.description}
-            </p>
-          </div>
+        {ev.description && (
+          <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-fg/70">{ev.description}</p>
         )}
+
+        <p className="mt-6 font-mono text-[10px] text-muted">Fuente: {SOURCE_LABELS[ev.source] ?? ev.source}</p>
       </div>
 
-      {/* Bottom Sticky Action Bar */}
-      <div className="grid grid-cols-2 gap-2.5 border-t border-slate-900/12 bg-white/90 p-3.5 dark:border-white/12 dark:bg-slate-900/90">
+      {/* Actions */}
+      <div className="grid shrink-0 grid-cols-[auto_1fr_1fr] gap-2 border-t border-line p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          onClick={() => onToggleFavorite(fav)}
+          aria-pressed={isFavorite}
+          aria-label={isFavorite ? "Quitar de guardados" : "Guardar"}
+          className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${
+            isFavorite ? "border-accent bg-accent/15 text-accent" : "border-line text-muted hover:text-fg"
+          }`}
+        >
+          <svg viewBox="0 0 24 24" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+            <path d="M6 3h12v18l-6-4-6 4V3Z" />
+          </svg>
+        </button>
         <a
-          href={directionsUrl}
+          href={`https://www.google.com/maps/dir/?api=1&destination=${ev.lat},${ev.lng}&travelmode=transit`}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-900/15 bg-[#fcfaf5] px-3 py-2.5 text-xs font-extrabold text-slate-900 shadow-xs transition hover:bg-slate-100 dark:border-white/15 dark:bg-slate-800 dark:text-slate-100"
+          className="flex h-11 items-center justify-center rounded-xl border border-line text-sm font-medium text-fg hover:bg-raised"
         >
-          <span>🧭</span>
-          <span>Cómo llegar</span>
+          Cómo llegar
         </a>
         <a
-          href={current.ticketsUrl || current.url}
+          href={ev.ticketsUrl || ev.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-950 px-3 py-2.5 text-xs font-extrabold text-white shadow-md transition hover:bg-slate-800 dark:bg-rose-600 dark:hover:bg-rose-500"
+          className="flex h-11 items-center justify-center rounded-xl bg-accent text-sm font-semibold text-ink hover:brightness-110"
         >
-          <span>🎟️</span>
-          <span>Entradas / Web oficial</span>
+          Entradas
         </a>
       </div>
     </aside>

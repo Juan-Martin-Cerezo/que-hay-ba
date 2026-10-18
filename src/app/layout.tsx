@@ -1,49 +1,52 @@
-import type { Metadata } from "next";
-import { Fraunces, JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Instrument_Sans, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const displaySerif = Fraunces({
-  variable: "--font-display",
+const display = Instrument_Serif({
+  variable: "--ff-display",
   subsets: ["latin"],
-  weight: ["600", "700", "800"],
+  weight: "400",
+  style: ["normal", "italic"],
 });
 
-const jakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-sans",
+const sans = Instrument_Sans({
+  variable: "--ff-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-mono",
+const mono = JetBrains_Mono({
+  variable: "--ff-mono",
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["400", "500", "600"],
 });
 
 export const metadata: Metadata = {
-  title: "Qué Hay BA — Cartografía Cultural y Eventos en Vivo · CABA",
+  title: "Qué Hay BA — Mapa de actividades y eventos en CABA",
   description:
-    "Atlas interactivo en tiempo real de recitales, teatro, museos, ferias gastronómicas, talleres y actividades gratuitas en la Ciudad Autónoma de Buenos Aires.",
+    "Mapa interactivo en tiempo real de recitales, teatro, museos, ferias, talleres y actividades gratuitas en la Ciudad de Buenos Aires.",
   openGraph: {
-    title: "Qué Hay BA — Cartografía Cultural de Buenos Aires",
-    description:
-      "Mapa interactivo en tiempo real con la agenda cultural, teatral y recreativa de la Ciudad de Buenos Aires.",
+    title: "Qué Hay BA — Qué hacer hoy en Buenos Aires",
+    description: "Agenda cultural de CABA sobre un mapa interactivo.",
     locale: "es_AR",
     type: "website",
   },
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export const viewport: Viewport = {
+  themeColor: "#09090b",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="es-AR"
-      className={`${displaySerif.variable} ${jakartaSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`dark ${display.variable} ${sans.variable} ${mono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

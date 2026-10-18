@@ -58,23 +58,23 @@ export type WhenFilter = (typeof WHEN_FILTERS)[number]["id"] | "date" | "upcomin
 
 export const CABA_ZONES = [
   { id: "all", label: "Toda CABA", lat: -34.6037, lng: -58.4173, zoom: 12.2 },
-  { id: "centro", label: "Av. Corrientes · Centro", lat: -34.6037, lng: -58.3816, zoom: 14.5 },
+  { id: "centro", label: "Centro", lat: -34.6037, lng: -58.3816, zoom: 14.5 },
   { id: "palermo", label: "Palermo", lat: -34.5835, lng: -58.4285, zoom: 14.2 },
   { id: "recoleta", label: "Recoleta", lat: -34.5885, lng: -58.3935, zoom: 14.5 },
-  { id: "santelmo", label: "San Telmo · La Boca", lat: -34.6215, lng: -58.3715, zoom: 14.2 },
-  { id: "chacarita", label: "Chacarita · V. Crespo", lat: -34.5915, lng: -58.4455, zoom: 14.3 },
-  { id: "almagro", label: "Abasto · Almagro", lat: -34.6045, lng: -58.4135, zoom: 14.5 },
-  { id: "belgrano", label: "Belgrano · Núñez", lat: -34.5595, lng: -58.4565, zoom: 14.0 },
+  { id: "santelmo", label: "San Telmo", lat: -34.6215, lng: -58.3715, zoom: 14.2 },
+  { id: "chacarita", label: "Villa Crespo", lat: -34.5915, lng: -58.4455, zoom: 14.3 },
+  { id: "almagro", label: "Almagro", lat: -34.6045, lng: -58.4135, zoom: 14.5 },
+  { id: "belgrano", label: "Belgrano", lat: -34.5595, lng: -58.4565, zoom: 14.0 },
   { id: "caballito", label: "Caballito", lat: -34.6185, lng: -58.4415, zoom: 14.2 },
 ] as const;
 
 export type MapThemeId = "voyager" | "light" | "dark" | "osm";
 
 export const MAP_THEMES: ReadonlyArray<{ id: MapThemeId; label: string }> = [
-  { id: "voyager", label: "Urbano CABA" },
-  { id: "osm", label: "GCBA + Subte" },
-  { id: "dark", label: "Nocturno" },
-  { id: "light", label: "Callejero" },
+  { id: "dark", label: "Noche" },
+  { id: "osm", label: "Subte" },
+  { id: "voyager", label: "Relieve" },
+  { id: "light", label: "Calles" },
 ];
 
 export const SOURCE_LABELS: Record<string, string> = {

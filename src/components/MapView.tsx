@@ -6,12 +6,11 @@ import {
   Map as MapLibreMap,
   Marker,
   NavigationControl,
-  type DataDrivenPropertyValueSpecification,
   type GeoJSONSource,
   type StyleSpecification,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { CATEGORIES, categoryById, type CategoryId, type MapThemeId } from "@/lib/domain";
+import { categoryById, type CategoryId, type MapThemeId } from "@/lib/domain";
 import { formatEventDate } from "@/lib/format";
 
 export interface MapEventProperties {
@@ -48,12 +47,11 @@ export interface EventsGeoJSON {
   }>;
 }
 
-export interface VenueLocationGroup {
+interface VenueGroup {
   key: string;
   lat: number;
   lng: number;
   venueName: string;
-  barrio: string | null;
   events: MapEventProperties[];
 }
 
@@ -64,142 +62,63 @@ interface MapViewProps {
   mapTheme: MapThemeId;
   userLocation: { lat: number; lng: number } | null;
   flyTarget: { lat: number; lng: number; zoom?: number; ts: number } | null;
-  onSelectEvent: (ev: MapEventProperties, siblingEvents?: MapEventProperties[]) => void;
+  onSelectEvent: (ev: MapEventProperties) => void;
 }
 
-const TILE_SOURCES = {
-  voyager: [
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-  ],
-  light: [
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
-  ],
-  darkBase: [
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-  ],
-  darkRef: [
-    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
-  ],
-  osm: [
-    "https://servicios.usig.buenosaires.gob.ar/mapcache/tms/1.0.0/amba_con_transporte_3857@GoogleMapsCompatible/{z}/{x}/{y}.png",
-  ],
+const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
+const RASTERS: Record<string, { tiles: string[]; scheme?: "tms"; attribution?: string }> = {
+  dark: { tiles: [`${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`], attribution: "© Esri · OpenStreetMap" },
+  "dark-ref": { tiles: [`${ESRI}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`] },
+  voyager: { tiles: [`${ESRI}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`], attribution: "© Esri · OpenStreetMap" },
+  light: { tiles: [`${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`], attribution: "© Esri · OpenStreetMap" },
+  osm: {
+    tiles: [
+      "https://servicios.usig.buenosaires.gob.ar/mapcache/tms/1.0.0/amba_con_transporte_3857@GoogleMapsCompatible/{z}/{x}/{y}.png",
+    ],
+    scheme: "tms",
+    attribution: "© USIG · GCBA",
+  },
 };
 
-function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): StyleSpecification {
-  const colorMatch: unknown[] = ["match", ["get", "category"]];
-  for (const c of CATEGORIES) {
-    colorMatch.push(c.id, c.color);
-  }
-  colorMatch.push("#e11d48");
+// Layer id → which theme shows it.
+const LAYER_THEME: Record<string, MapThemeId> = {
+  dark: "dark",
+  "dark-ref": "dark",
+  voyager: "voyager",
+  light: "light",
+  osm: "osm",
+};
 
+function buildStyle(theme: MapThemeId): StyleSpecification {
+  const ids = Object.keys(RASTERS);
   return {
     version: 8,
-    sources: {
-      "base-voyager": {
-        type: "raster",
-        tiles: TILE_SOURCES.voyager,
-        tileSize: 256,
-        attribution: "© OpenStreetMap · Esri · USIG GCBA",
-      },
-      "base-light": {
-        type: "raster",
-        tiles: TILE_SOURCES.light,
-        tileSize: 256,
-        attribution: "© OpenStreetMap · Esri",
-      },
-      "base-dark": {
-        type: "raster",
-        tiles: TILE_SOURCES.darkBase,
-        tileSize: 256,
-        attribution: "© OpenStreetMap · Esri",
-      },
-      "base-dark-ref": {
-        type: "raster",
-        tiles: TILE_SOURCES.darkRef,
-        tileSize: 256,
-      },
-      "base-osm": {
-        type: "raster",
-        tiles: TILE_SOURCES.osm,
-        scheme: "tms",
-        tileSize: 256,
-        attribution: "© USIG Gobierno de la Ciudad de Buenos Aires",
-      },
-      events: {
-        type: "geojson",
-        data: initialData as unknown as GeoJSON.FeatureCollection,
-      },
-    },
-    layers: [
-      {
-        id: "layer-voyager",
-        type: "raster",
-        source: "base-voyager",
-        layout: { visibility: activeTheme === "voyager" ? "visible" : "none" },
-      },
-      {
-        id: "layer-light",
-        type: "raster",
-        source: "base-light",
-        layout: { visibility: activeTheme === "light" ? "visible" : "none" },
-      },
-      {
-        id: "layer-dark",
-        type: "raster",
-        source: "base-dark",
-        layout: { visibility: activeTheme === "dark" ? "visible" : "none" },
-        paint: {
-          "raster-brightness-min": 0.05,
-          "raster-contrast": 0.15,
-        },
-      },
-      {
-        id: "layer-dark-ref",
-        type: "raster",
-        source: "base-dark-ref",
-        layout: { visibility: activeTheme === "dark" ? "visible" : "none" },
-      },
-      {
-        id: "layer-osm",
-        type: "raster",
-        source: "base-osm",
-        layout: { visibility: activeTheme === "osm" ? "visible" : "none" },
-      },
-      {
-        id: "event-pins-halo",
-        type: "circle",
-        source: "events",
-        paint: {
-          "circle-color": colorMatch as DataDrivenPropertyValueSpecification<string>,
-          "circle-opacity": 0.22,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 8, 14, 13, 17, 18],
-        },
-      },
-      {
-        id: "event-pins",
-        type: "circle",
-        source: "events",
-        paint: {
-          "circle-color": colorMatch as DataDrivenPropertyValueSpecification<string>,
-          "circle-radius": ["interpolate", ["linear"], ["zoom"], 10.5, 4.5, 14, 7, 17, 10],
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff",
-        },
-      },
-    ],
+    sources: Object.fromEntries(
+      ids.map((id) => [id, { type: "raster", tileSize: 256, ...RASTERS[id] }])
+    ) as StyleSpecification["sources"],
+    layers: ids.map((id) => ({
+      id: `layer-${id}`,
+      type: "raster" as const,
+      source: id,
+      layout: { visibility: LAYER_THEME[id] === theme ? ("visible" as const) : ("none" as const) },
+      paint: id === "dark" ? { "raster-contrast": 0.12, "raster-brightness-min": 0.04 } : {},
+    })),
   };
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+function esc(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function shortText(str: string, maxLen: number): string {
-  return str.length > maxLen ? `${str.slice(0, maxLen - 1).trim()}…` : str;
+function clip(s: string, n: number): string {
+  return s.length > n ? `${s.slice(0, n - 1).trim()}…` : s;
+}
+
+/** Map padding so fly-to targets stay clear of the panel (left on desktop, bottom sheet on mobile). */
+function panelPadding() {
+  return window.innerWidth >= 1024
+    ? { top: 24, right: 24, bottom: 24, left: 404 }
+    : { top: 72, right: 16, bottom: 200, left: 16 };
 }
 
 export function MapView({
@@ -214,52 +133,39 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const userMarkerRef = useRef<Marker | null>(null);
-  const bubbleMarkersRef = useRef<Map<string, Marker>>(new Map());
-  const expandedMarkerRef = useRef<Marker | null>(null);
-
-  const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null);
-  const [viewportTick, setViewportTick] = useState(0);
+  const pinsRef = useRef<Marker[]>([]);
+  const stackRef = useRef<Marker | null>(null);
+  const onSelectRef = useRef(onSelectEvent);
+  const [openStack, setOpenStack] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
   const [webglError, setWebglError] = useState(false);
 
-  const onSelectRef = useRef(onSelectEvent);
   useEffect(() => {
     onSelectRef.current = onSelectEvent;
   }, [onSelectEvent]);
 
-  // Group experiences that share the exact same physical location/venue
-  const locationGroups = useMemo<VenueLocationGroup[]>(() => {
-    const groups = new Map<string, VenueLocationGroup>();
-    for (const feat of data.features) {
-      const ev = feat.properties;
+  // Experiences sharing the same venue collapse into one globito.
+  const groups = useMemo<VenueGroup[]>(() => {
+    const byKey = new Map<string, VenueGroup>();
+    for (const f of data.features) {
+      const ev = f.properties;
       const key = `${ev.lat.toFixed(4)},${ev.lng.toFixed(4)}`;
-      let g = groups.get(key);
-      if (!g) {
-        g = {
-          key,
-          lat: ev.lat,
-          lng: ev.lng,
-          venueName: ev.venueName,
-          barrio: ev.barrio,
-          events: [],
-        };
-        groups.set(key, g);
-      }
+      const g = byKey.get(key) ?? { key, lat: ev.lat, lng: ev.lng, venueName: ev.venueName, events: [] };
       g.events.push(ev);
+      byKey.set(key, g);
     }
-    return Array.from(groups.values());
+    return [...byKey.values()];
   }, [data.features]);
 
-  // Initialize MapLibre map
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
-
     let map: MapLibreMap;
     try {
       map = new MapLibreMap({
         container: containerRef.current,
-        style: buildMapStyle(data, mapTheme),
-        center: [-58.404, -34.6015],
-        zoom: 13.0,
+        style: buildStyle(mapTheme),
+        center: [-58.41, -34.6037],
+        zoom: 12.6,
         minZoom: 10.5,
         maxZoom: 18.5,
         maxBounds: [
@@ -274,308 +180,162 @@ export function MapView({
     }
 
     map.addControl(new AttributionControl({ compact: true }), "bottom-right");
-    map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    map.setPadding(panelPadding());
 
-    const triggerUpdate = () => setViewportTick((t) => t + 1);
-
+    const bump = () => setTick((t) => t + 1);
     map.on("load", () => {
       map.resize();
-      triggerUpdate();
+      bump();
     });
-    map.on("moveend", triggerUpdate);
-    map.on("zoomend", triggerUpdate);
-    map.on("click", () => {
-      setExpandedGroupKey(null);
-    });
+    map.on("moveend", bump);
+    map.on("click", () => setOpenStack(null));
 
     const ro = new ResizeObserver(() => {
       map.resize();
+      map.setPadding(panelPadding());
     });
     ro.observe(containerRef.current);
 
     mapRef.current = map;
     return () => {
       ro.disconnect();
-      expandedMarkerRef.current?.remove();
-      for (const m of bubbleMarkersRef.current.values()) {
-        m.remove();
-      }
-      bubbleMarkersRef.current.clear();
+      pinsRef.current.forEach((m) => m.remove());
+      stackRef.current?.remove();
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update GeoJSON source whenever filtered events change
+  // Re-render globitos when data changes (new filter result).
   useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const applyData = () => {
-      const src = map.getSource("events") as GeoJSONSource | undefined;
-      if (src) {
-        src.setData(data as unknown as GeoJSON.FeatureCollection);
-      }
-      setViewportTick((t) => t + 1);
-    };
-    applyData();
-    map.once("load", applyData);
+    setTick((t) => t + 1);
   }, [data]);
 
-  // Render real HTML Speech-Bubble "Globitos" on the map for visible locations
+  // Globitos: HTML markers, one per venue, limited to the viewport.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-
-    const bounds = map.getBounds();
+    const b = map.getBounds();
     const zoom = map.getZoom();
+    const detailed = zoom >= 13.6;
+    const cap = zoom >= 15 ? 140 : zoom >= 13.6 ? 90 : 220;
 
-    // Filter location groups inside current map bounds (or fallback to all if bounds not ready)
-    const inView = locationGroups.filter((g) => {
-      if (!bounds) return true;
-      return (
-        g.lng >= bounds.getWest() - 0.01 &&
-        g.lng <= bounds.getEast() + 0.01 &&
-        g.lat >= bounds.getSouth() - 0.01 &&
-        g.lat <= bounds.getNorth() + 0.01
-      );
-    });
-
-    // Prioritize locations with selected/hovered event, then multi-event hubs, up to 85 globitos simultaneously
-    const maxBubbles = zoom >= 14.5 ? 110 : zoom >= 13 ? 80 : 60;
-    const prioritized = [...inView]
-      .sort((a, b) => {
-        const aActive = a.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0;
-        const bActive = b.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0;
-        if (aActive !== bActive) return bActive - aActive;
-        return b.events.length - a.events.length;
+    const visible = groups
+      .filter((g) => g.lng >= b.getWest() && g.lng <= b.getEast() && g.lat >= b.getSouth() && g.lat <= b.getNorth())
+      .sort((a, z) => {
+        const act = (g: VenueGroup) => (g.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0);
+        return act(z) - act(a) || z.events.length - a.events.length;
       })
-      .slice(0, maxBubbles);
+      .slice(0, cap);
 
-    // Clear previous markers and mount crisp updated HTML globitos
-    for (const m of bubbleMarkersRef.current.values()) {
-      m.remove();
-    }
-    bubbleMarkersRef.current.clear();
+    pinsRef.current.forEach((m) => m.remove());
+    pinsRef.current = [];
 
-    for (const group of prioritized) {
-      const count = group.events.length;
-      const primary = group.events[0];
-      const cat = categoryById[primary.category] ?? categoryById.arte;
-      const isSelected = group.events.some((e) => e.id === selectedId);
-      const isHovered = group.events.some((e) => e.id === hoveredId);
-      const hasFree = group.events.some((e) => e.isFree);
-
-      // Collect up to 3 distinct category emojis present at this exact location
-      const uniqueCats = Array.from(new Set(group.events.map((e) => e.category))).slice(0, 3);
-      const iconsHtml = uniqueCats
-        .map((cid) => {
-          const c = categoryById[cid] ?? categoryById.arte;
-          return `<span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:${c.color};color:#fff;font-size:12px;border:1.5px solid #fff;margin-right:-4px;box-shadow:0 2px 4px rgba(0,0,0,0.25);">${c.emoji}</span>`;
-        })
-        .join("");
+    for (const g of visible) {
+      const first = g.events[0];
+      const n = g.events.length;
+      const cat = categoryById[first.category] ?? categoryById.arte;
+      const selected = g.events.some((e) => e.id === selectedId);
+      const hovered = g.events.some((e) => e.id === hoveredId);
+      const free = g.events.some((e) => e.isFree);
 
       const el = document.createElement("button");
       el.type = "button";
-      el.style.cssText = `
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        background: transparent;
-        border: none;
-        padding: 0;
-        cursor: pointer;
-        transform: ${isSelected || isHovered ? "scale(1.12)" : "scale(1)"};
-        z-index: ${isSelected ? 50 : isHovered ? 40 : count > 1 ? 20 : 10};
-        transition: transform 0.16s ease;
-      `;
+      el.className = "qhba-pin";
+      el.setAttribute("aria-label", n > 1 ? `${n} experiencias en ${g.venueName}` : first.title);
+      el.style.cssText = `display:block;background:none;border:0;padding:0;cursor:pointer;z-index:${selected ? 30 : hovered ? 20 : n > 1 ? 2 : 1};`;
 
-      const labelText =
-        count > 1
-          ? `${count} exp. · ${shortText(group.venueName, 18)}`
-          : shortText(primary.title, 20);
+      if (!detailed && !selected && !hovered) {
+        // Overview: compact icon globito with count badge for multi-experience venues.
+        el.innerHTML = `
+          <span style="display:flex;flex-direction:column;align-items:center">
+            <span style="display:flex;align-items:center;gap:4px;height:26px;padding:0 ${n > 1 || free ? "8px" : "6px"};border-radius:999px;background:#111113;border:1.5px solid ${cat.color};color:#ededef;box-shadow:0 6px 16px -4px rgba(0,0,0,.75);font:600 11px var(--ff-mono),monospace">
+              <span style="font-size:12px;line-height:1">${cat.emoji}</span>
+              ${n > 1 ? `<span>×${n}</span>` : ""}
+              ${free && n === 1 ? `<span style="font-size:9.5px;color:#34d399">$0</span>` : ""}
+            </span>
+            <span style="width:2px;height:4px;background:${cat.color}"></span>
+          </span>`;
+      } else {
+        const bg = selected ? "#f5b84a" : "#111113";
+        const fg = selected ? "#09090b" : "#ededef";
+        const border = selected ? "#f5b84a" : hovered ? "#ededef" : `${cat.color}88`;
+        const label = n > 1 ? clip(g.venueName, 20) : clip(first.title, 22);
+        el.innerHTML = `
+          <span style="display:flex;flex-direction:column;align-items:center;transform:${hovered && !selected ? "translateY(-2px)" : "none"};transition:transform .15s">
+            <span style="display:flex;align-items:center;gap:6px;padding:4px 10px 4px 5px;border-radius:999px;background:${bg};color:${fg};border:1.5px solid ${border};box-shadow:0 10px 24px -6px rgba(0,0,0,.8);white-space:nowrap;font:600 11.5px var(--ff-sans),sans-serif;letter-spacing:-.01em">
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:${selected ? "#09090b22" : `${cat.color}26`};font-size:11.5px;line-height:1">${cat.emoji}</span>
+              <span>${esc(label)}</span>
+              ${n > 1 ? `<span style="padding:1px 5px;border-radius:999px;background:${selected ? "#09090b1f" : "rgba(255,255,255,.09)"};font:600 10px var(--ff-mono),monospace">×${n}</span>` : ""}
+              ${free ? `<span style="font:600 10px var(--ff-mono),monospace;color:${selected ? "#065f46" : "#34d399"}">$0</span>` : ""}
+            </span>
+            <span style="width:1.5px;height:6px;background:${border}"></span>
+            <span style="width:5px;height:5px;border-radius:999px;background:${cat.color}"></span>
+          </span>`;
+      }
 
-      const bgPill = isSelected
-        ? "#0f172a"
-        : isHovered
-          ? "#e11d48"
-          : "rgba(255, 255, 255, 0.97)";
-      const textColor = isSelected || isHovered ? "#ffffff" : "#0f172a";
-      const borderColor = isSelected ? "#f59e0b" : isHovered ? "#ffffff" : cat.color;
-
-      el.innerHTML = `
-        <div style="
-          display: flex;
-          align-items: center;
-          gap: 7px;
-          padding: 3.5px 9px 3.5px 5px;
-          border-radius: 999px;
-          background: ${bgPill};
-          color: ${textColor};
-          border: 2px solid ${borderColor};
-          box-shadow: 0 8px 20px -4px rgba(15, 23, 42, 0.38);
-          white-space: nowrap;
-          max-width: 230px;
-        ">
-          <div style="display:flex;align-items:center;padding-right:3px;">
-            ${iconsHtml}
-          </div>
-          <span style="font-size:11px;font-weight:800;letter-spacing:-0.01em;overflow:hidden;text-overflow:ellipsis;">
-            ${escapeHtml(labelText)}
-          </span>
-          ${
-            hasFree
-              ? `<span style="font-family:monospace;font-size:9.5px;font-weight:900;padding:1px 5px;border-radius:999px;background:#10b981;color:#ffffff;">$0</span>`
-              : ""
-          }
-        </div>
-        <div style="
-          width: 0;
-          height: 0;
-          border-left: 6px solid transparent;
-          border-right: 6px solid transparent;
-          border-top: 7px solid ${borderColor};
-          margin-top: -1px;
-        "></div>
-      `;
-
-      el.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        if (count > 1) {
-          setExpandedGroupKey((prev) => (prev === group.key ? null : group.key));
-          onSelectRef.current(primary, group.events);
-        } else {
-          setExpandedGroupKey(null);
-          onSelectRef.current(primary, group.events);
-        }
-      });
-
-      const marker = new Marker({ element: el, anchor: "bottom" })
-        .setLngLat([group.lng, group.lat])
-        .addTo(map);
-
-      bubbleMarkersRef.current.set(group.key, marker);
-    }
-  }, [locationGroups, viewportTick, selectedId, hoveredId]);
-
-  // Render on-map expanded "Racimo de Globitos" popover when a multi-experience location is clicked
-  useEffect(() => {
-    const map = mapRef.current;
-    expandedMarkerRef.current?.remove();
-    expandedMarkerRef.current = null;
-
-    if (!map || !expandedGroupKey) return;
-    const group = locationGroups.find((g) => g.key === expandedGroupKey);
-    if (!group || group.events.length <= 1) return;
-
-    const container = document.createElement("div");
-    container.style.cssText = `
-      background: rgba(11, 15, 25, 0.96);
-      color: #f8fafc;
-      border: 1.5px solid rgba(255, 255, 255, 0.18);
-      border-radius: 20px;
-      padding: 10px;
-      width: 280px;
-      max-height: 270px;
-      overflow-y: auto;
-      box-shadow: 0 24px 42px -8px rgba(0, 0, 0, 0.6);
-      backdrop-filter: blur(16px);
-      z-index: 90;
-      margin-bottom: 36px;
-    `;
-
-    const header = document.createElement("div");
-    header.style.cssText = `
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 2px 4px 8px 4px;
-      border-bottom: 1px dashed rgba(255,255,255,0.15);
-      margin-bottom: 7px;
-      font-size: 11px;
-      font-weight: 800;
-      color: #fbbf24;
-    `;
-    header.innerHTML = `
-      <span>📍 ${escapeHtml(shortText(group.venueName, 26))} (${group.events.length})</span>
-      <button type="button" style="color:#94a3b8;font-size:12px;font-weight:800;cursor:pointer;background:none;border:none;">✕</button>
-    `;
-    header.querySelector("button")?.addEventListener("click", (e) => {
-      e.stopPropagation();
-      setExpandedGroupKey(null);
-    });
-    container.appendChild(header);
-
-    const list = document.createElement("div");
-    list.style.cssText = "display:flex;flex-direction:column;gap:5px;";
-
-    for (const ev of group.events) {
-      const cat = categoryById[ev.category] ?? categoryById.arte;
-      const itemBtn = document.createElement("button");
-      itemBtn.type = "button";
-      itemBtn.style.cssText = `
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        width: 100%;
-        text-align: left;
-        padding: 6px 8px;
-        border-radius: 12px;
-        background: ${ev.id === selectedId ? "rgba(225, 29, 72, 0.28)" : "rgba(255, 255, 255, 0.07)"};
-        border: 1px solid ${ev.id === selectedId ? "#e11d48" : "rgba(255, 255, 255, 0.1)"};
-        color: #ffffff;
-        cursor: pointer;
-      `;
-      itemBtn.innerHTML = `
-        <span style="display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:999px;background:${cat.color};font-size:13px;flex-shrink:0;">
-          ${cat.emoji}
-        </span>
-        <div style="min-width:0;flex:1;">
-          <div style="font-size:11.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            ${escapeHtml(ev.title)}
-          </div>
-          <div style="font-family:monospace;font-size:10px;color:#cbd5e1;display:flex;justify-content:space-between;gap:4px;">
-            <span>${escapeHtml(formatEventDate(ev.startsAt))}</span>
-            <span style="color:${ev.isFree ? "#34d399" : "#fde68a"};font-weight:800;">${escapeHtml(ev.priceLabel)}</span>
-          </div>
-        </div>
-      `;
-      itemBtn.addEventListener("click", (e) => {
+      el.addEventListener("click", (e) => {
         e.stopPropagation();
-        onSelectRef.current(ev, group.events);
+        if (n > 1) setOpenStack((k) => (k === g.key ? null : g.key));
+        else setOpenStack(null);
+        onSelectRef.current(first);
       });
-      list.appendChild(itemBtn);
+
+      pinsRef.current.push(
+        new Marker({ element: el, anchor: "bottom" }).setLngLat([g.lng, g.lat]).addTo(map)
+      );
+    }
+  }, [groups, tick, selectedId, hoveredId]);
+
+  // Stack popover listing every experience at one venue.
+  useEffect(() => {
+    stackRef.current?.remove();
+    stackRef.current = null;
+    const map = mapRef.current;
+    const g = openStack ? groups.find((x) => x.key === openStack) : null;
+    if (!map || !g || g.events.length < 2) return;
+
+    const box = document.createElement("div");
+    box.style.cssText =
+      "width:280px;max-height:260px;overflow:auto;margin-bottom:44px;padding:6px;border-radius:16px;background:rgba(17,17,19,.97);border:1px solid rgba(255,255,255,.1);box-shadow:0 24px 48px -12px rgba(0,0,0,.85);backdrop-filter:blur(12px)";
+    box.innerHTML = `<div style="padding:6px 8px 8px;font:500 10px var(--ff-mono),monospace;letter-spacing:.06em;text-transform:uppercase;color:#8b8b93">${esc(clip(g.venueName, 30))} · ${g.events.length} experiencias</div>`;
+    box.addEventListener("click", (e) => e.stopPropagation());
+
+    for (const ev of g.events) {
+      const c = categoryById[ev.category] ?? categoryById.arte;
+      const row = document.createElement("button");
+      row.type = "button";
+      row.style.cssText = `display:flex;align-items:center;gap:9px;width:100%;text-align:left;padding:7px 8px;border:0;border-radius:10px;cursor:pointer;color:#ededef;background:${ev.id === selectedId ? "rgba(245,184,74,.14)" : "transparent"}`;
+      row.innerHTML = `
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:999px;background:${c.color}24;border:1px solid ${c.color}66;font-size:11px;flex-shrink:0">${c.emoji}</span>
+        <span style="min-width:0;flex:1">
+          <span style="display:block;font:600 12px var(--ff-sans),sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ev.title)}</span>
+          <span style="display:flex;justify-content:space-between;gap:6px;font:400 10.5px var(--ff-mono),monospace;color:#8b8b93">
+            <span>${esc(formatEventDate(ev.startsAt))}</span>
+            <span style="color:${ev.isFree ? "#34d399" : "#8b8b93"}">${esc(ev.priceLabel)}</span>
+          </span>
+        </span>`;
+      row.addEventListener("mouseenter", () => (row.style.background = "rgba(255,255,255,.05)"));
+      row.addEventListener("mouseleave", () => (row.style.background = ev.id === selectedId ? "rgba(245,184,74,.14)" : "transparent"));
+      row.addEventListener("click", () => onSelectRef.current(ev));
+      box.appendChild(row);
     }
 
-    container.appendChild(list);
-    container.addEventListener("click", (e) => e.stopPropagation());
+    stackRef.current = new Marker({ element: box, anchor: "bottom" }).setLngLat([g.lng, g.lat]).addTo(map);
+  }, [openStack, groups, selectedId]);
 
-    expandedMarkerRef.current = new Marker({ element: container, anchor: "bottom" })
-      .setLngLat([group.lng, group.lat])
-      .addTo(map);
-  }, [expandedGroupKey, locationGroups, selectedId]);
-
-  // Switch active raster base layer instantly when mapTheme changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const themes: MapThemeId[] = ["voyager", "light", "dark", "osm"];
-    for (const t of themes) {
-      const layerId = `layer-${t}`;
-      if (map.getLayer(layerId)) {
-        map.setLayoutProperty(layerId, "visibility", t === mapTheme ? "visible" : "none");
+    for (const id of Object.keys(RASTERS)) {
+      if (map.getLayer(`layer-${id}`)) {
+        map.setLayoutProperty(`layer-${id}`, "visibility", LAYER_THEME[id] === mapTheme ? "visible" : "none");
       }
-    }
-    if (map.getLayer("layer-dark-ref")) {
-      map.setLayoutProperty(
-        "layer-dark-ref",
-        "visibility",
-        mapTheme === "dark" ? "visible" : "none"
-      );
     }
   }, [mapTheme]);
 
-  // Fly to requested target
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !flyTarget) return;
@@ -586,7 +346,6 @@ export function MapView({
     });
   }, [flyTarget]);
 
-  // Render user location marker
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -597,11 +356,9 @@ export function MapView({
     }
     if (!userMarkerRef.current) {
       const el = document.createElement("div");
-      el.className =
-        "h-4 w-4 rounded-full bg-sky-500 ring-4 ring-sky-500/35 border-2 border-white shadow-lg";
-      userMarkerRef.current = new Marker({ element: el })
-        .setLngLat([userLocation.lng, userLocation.lat])
-        .addTo(map);
+      el.style.cssText =
+        "width:14px;height:14px;border-radius:999px;background:#38bdf8;border:2px solid #09090b;box-shadow:0 0 0 6px rgba(56,189,248,.22)";
+      userMarkerRef.current = new Marker({ element: el }).setLngLat([userLocation.lng, userLocation.lat]).addTo(map);
     } else {
       userMarkerRef.current.setLngLat([userLocation.lng, userLocation.lat]);
     }
@@ -609,20 +366,14 @@ export function MapView({
 
   if (webglError) {
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 p-6 text-center dark:bg-slate-900">
-        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-          Tu navegador tiene aceleración WebGL desactivada. Explorá el listado lateral de
-          actividades.
-        </p>
+      <div className="absolute inset-0 flex items-center justify-center bg-ink p-6 text-center text-sm text-muted">
+        Tu navegador no tiene WebGL activo. Usá el listado de actividades.
       </div>
     );
   }
 
-  return (
-    <div
-      ref={containerRef}
-      style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-      className="absolute inset-0 h-full w-full"
-    />
-  );
+  return <div ref={containerRef} className="absolute inset-0" />;
 }
+
+// Kept for API compatibility with callers that import the source type.
+export type { GeoJSONSource };
