@@ -71,10 +71,10 @@ export const CABA_ZONES = [
 export type MapThemeId = "voyager" | "light" | "dark" | "osm";
 
 export const MAP_THEMES: ReadonlyArray<{ id: MapThemeId; label: string }> = [
-  { id: "voyager", label: "Color Nítido" },
-  { id: "light", label: "Claro" },
+  { id: "voyager", label: "Urbano CABA" },
+  { id: "osm", label: "GCBA + Subte" },
   { id: "dark", label: "Nocturno" },
-  { id: "osm", label: "Callejero" },
+  { id: "light", label: "Callejero" },
 ];
 
 export const SOURCE_LABELS: Record<string, string> = {

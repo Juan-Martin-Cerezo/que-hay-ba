@@ -61,23 +61,22 @@ interface MapViewProps {
   onSelectEvent: (ev: MapEventProperties) => void;
 }
 
-const TILE_SOURCES: Record<MapThemeId, string[]> = {
+const TILE_SOURCES = {
   voyager: [
-    "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-    "https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
-    "https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
   ],
   light: [
-    "https://a.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
-    "https://b.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
-    "https://c.basemaps.cartocdn.com/rastertiles/light_all/{z}/{x}/{y}@2x.png",
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
   ],
-  dark: [
-    "https://a.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png",
-    "https://b.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png",
-    "https://c.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}@2x.png",
+  darkBase: [
+    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
   ],
-  osm: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+  darkRef: [
+    "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+  ],
+  osm: [
+    "https://servicios.usig.buenosaires.gob.ar/mapcache/tms/1.0.0/amba_con_transporte_3857@GoogleMapsCompatible/{z}/{x}/{y}.png",
+  ],
 };
 
 function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): StyleSpecification {
@@ -95,25 +94,31 @@ function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): Sty
         type: "raster",
         tiles: TILE_SOURCES.voyager,
         tileSize: 256,
-        attribution: "© OpenStreetMap contributors © CARTO",
+        attribution: "© OpenStreetMap · Esri · USIG GCBA",
       },
       "base-light": {
         type: "raster",
         tiles: TILE_SOURCES.light,
         tileSize: 256,
-        attribution: "© OpenStreetMap contributors © CARTO",
+        attribution: "© OpenStreetMap · Esri",
       },
       "base-dark": {
         type: "raster",
-        tiles: TILE_SOURCES.dark,
+        tiles: TILE_SOURCES.darkBase,
         tileSize: 256,
-        attribution: "© OpenStreetMap contributors © CARTO",
+        attribution: "© OpenStreetMap · Esri",
+      },
+      "base-dark-ref": {
+        type: "raster",
+        tiles: TILE_SOURCES.darkRef,
+        tileSize: 256,
       },
       "base-osm": {
         type: "raster",
         tiles: TILE_SOURCES.osm,
+        scheme: "tms",
         tileSize: 256,
-        attribution: "© OpenStreetMap contributors",
+        attribution: "© USIG Gobierno de la Ciudad de Buenos Aires",
       },
       events: {
         type: "geojson",
@@ -142,10 +147,15 @@ function buildMapStyle(initialData: EventsGeoJSON, activeTheme: MapThemeId): Sty
         source: "base-dark",
         layout: { visibility: activeTheme === "dark" ? "visible" : "none" },
         paint: {
-          "raster-brightness-min": 0.08,
-          "raster-contrast": 0.18,
-          "raster-saturation": 0.15,
+          "raster-brightness-min": 0.04,
+          "raster-contrast": 0.14,
         },
+      },
+      {
+        id: "layer-dark-ref",
+        type: "raster",
+        source: "base-dark-ref",
+        layout: { visibility: activeTheme === "dark" ? "visible" : "none" },
       },
       {
         id: "layer-osm",
@@ -420,6 +430,9 @@ export function MapView({
       if (map.getLayer(layerId)) {
         map.setLayoutProperty(layerId, "visibility", t === mapTheme ? "visible" : "none");
       }
+    }
+    if (map.getLayer("layer-dark-ref")) {
+      map.setLayoutProperty("layer-dark-ref", "visibility", mapTheme === "dark" ? "visible" : "none");
     }
   }, [mapTheme]);
 
