@@ -67,25 +67,25 @@ body {
   }
 }
 
-/* Globito entrance */
+/* Globito entrance — applied ONLY to inner wrapper so MapLibre's root marker transform is never overridden */
 @keyframes qhba-pop {
   from {
     opacity: 0;
-    transform: translateY(4px) scale(0.92);
+    transform: scale(0.9);
   }
   to {
     opacity: 1;
-    transform: none;
+    transform: scale(1);
   }
 }
-.qhba-pin {
-  animation: qhba-pop 0.22s ease-out both;
+.qhba-pin-inner {
+  animation: qhba-pop 0.18s ease-out;
 }
 
 /* Thin scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
 }
 .no-scrollbar {
   scrollbar-width: none;
@@ -95,7 +95,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .qhba-pin {
+  .qhba-pin-inner {
     animation: none;
   }
   * {

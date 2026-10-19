@@ -28,11 +28,18 @@ interface FilterBarProps {
 }
 
 const chip =
-  "shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent";
-const chipIdle = "border-line text-muted hover:border-white/20 hover:text-fg";
-const chipOn = "border-fg bg-fg text-ink";
+  "shrink-0 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent";
+const chipIdle = "border-line bg-ink/50 text-muted hover:border-white/20 hover:text-fg";
+const chipOn = "border-fg bg-fg text-ink font-semibold";
 
-export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocusSearch }: FilterBarProps) {
+export function FilterBar({
+  filters,
+  activeZone,
+  compact = false,
+  onChange,
+  onSelectZone,
+  onFocusSearch,
+}: FilterBarProps & { compact?: boolean }) {
   const [more, setMore] = useState(false);
   const customDate = /^\d{4}-\d{2}-\d{2}$/.test(filters.when) ? filters.when : "";
   const activeCount =
@@ -47,43 +54,66 @@ export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocus
     });
 
   return (
-    <div className="space-y-3">
-      {/* Search */}
-      <label className="relative block">
-        <span className="sr-only">Buscar actividades</span>
-        <svg
-          aria-hidden
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
-        >
-          <circle cx="11" cy="11" r="7" />
-          <path d="m20 20-3.5-3.5" />
-        </svg>
-        <input
-          type="search"
-          value={filters.q}
-          onFocus={onFocusSearch}
-          onChange={(e) => onChange({ ...filters, q: e.target.value })}
-          placeholder="Obra, banda, museo, barrio…"
-          className="h-11 w-full rounded-xl border border-line bg-raised pl-10 pr-10 text-sm text-fg placeholder:text-muted/70 focus:border-white/25 focus:outline-none"
-        />
-        {filters.q && (
-          <button
-            type="button"
-            onClick={() => onChange({ ...filters, q: "" })}
-            aria-label="Limpiar búsqueda"
-            className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-fg"
+    <div className="space-y-2">
+      {/* Search + quick filter button */}
+      <div className="flex items-center gap-2">
+        <label className="relative block flex-1">
+          <span className="sr-only">Buscar actividades</span>
+          <svg
+            aria-hidden
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
           >
-            ✕
-          </button>
-        )}
-      </label>
+            <circle cx="11" cy="11" r="7" />
+            <path d="m20 20-3.5-3.5" />
+          </svg>
+          <input
+            type="search"
+            value={filters.q}
+            onFocus={onFocusSearch}
+            onChange={(e) => onChange({ ...filters, q: e.target.value })}
+            placeholder="Obra, banda, museo, barrio…"
+            className="h-10 w-full rounded-xl border border-line bg-raised pl-9 pr-8 text-xs text-fg placeholder:text-muted/70 focus:border-white/25 focus:outline-none"
+          />
+          {filters.q && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...filters, q: "" })}
+              aria-label="Limpiar búsqueda"
+              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-fg"
+            >
+              ✕
+            </button>
+          )}
+        </label>
 
-      {/* When + free */}
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
+        <button
+          type="button"
+          aria-expanded={more}
+          onClick={() => setMore((v) => !v)}
+          className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
+            more || customDate || (filters.price && filters.price !== "free") || activeZone !== "all"
+              ? "border-accent bg-accent/15 text-accent"
+              : "border-line bg-raised text-muted hover:text-fg"
+          }`}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          <span>Filtros</span>
+          {activeCount > 0 && (
+            <span className="rounded-full bg-accent px-1.5 py-0.2 font-mono text-[10px] font-bold text-ink">
+              {activeCount}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* When + Gratis */}
+      <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
         {WHEN_FILTERS.map((w) => {
           const on = filters.when === w.id;
           return (
@@ -94,7 +124,9 @@ export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocus
               onClick={() => onChange({ ...filters, when: on ? "" : w.id })}
               className={`${chip} ${on ? chipOn : chipIdle}`}
             >
-              {w.id === "now" && <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />}
+              {w.id === "now" && (
+                <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 align-middle" />
+              )}
               {w.label}
             </button>
           );
@@ -103,43 +135,41 @@ export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocus
           type="button"
           aria-pressed={filters.price === "free"}
           onClick={() => onChange({ ...filters, price: filters.price === "free" ? "" : "free" })}
-          className={`${chip} ${filters.price === "free" ? "border-emerald-400 bg-emerald-400 text-ink" : chipIdle}`}
+          className={`${chip} ${
+            filters.price === "free"
+              ? "border-emerald-400 bg-emerald-400 font-semibold text-ink"
+              : chipIdle
+          }`}
         >
-          Gratis
-        </button>
-        <button
-          type="button"
-          aria-expanded={more}
-          onClick={() => setMore((v) => !v)}
-          className={`${chip} ${more || customDate || (filters.price && filters.price !== "free") || activeZone !== "all" ? "border-accent text-accent" : chipIdle}`}
-        >
-          Más filtros
+          $0 Gratis
         </button>
       </div>
 
       {/* Categories */}
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
-        {CATEGORIES.map((c) => {
-          const on = filters.categories.includes(c.id);
-          return (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={on}
-              onClick={() => toggleCat(c.id)}
-              className={`${chip} flex items-center gap-2 ${on ? "text-ink" : chipIdle}`}
-              style={on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined}
-            >
-              <span className="h-2 w-2 rounded-full" style={{ background: on ? "#09090b" : c.color }} />
-              {c.shortLabel}
-            </button>
-          );
-        })}
-      </div>
+      {!compact && (
+        <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          {CATEGORIES.map((c) => {
+            const on = filters.categories.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleCat(c.id)}
+                className={`${chip} flex items-center gap-1.5 ${on ? "text-ink font-semibold" : chipIdle}`}
+                style={on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined}
+              >
+                <span className="text-xs leading-none">{c.emoji}</span>
+                <span>{c.shortLabel}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {more && (
-        <div className="space-y-3 rounded-xl border border-line bg-raised/60 p-3">
-          <Group title="Barrio">
+        <div className="space-y-3 rounded-2xl border border-line bg-raised/95 p-3 shadow-xl">
+          <Group title="Barrio / Zona">
             {CABA_ZONES.map((z) => (
               <button
                 key={z.id}
@@ -151,7 +181,7 @@ export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocus
               </button>
             ))}
           </Group>
-          <Group title="Precio">
+          <Group title="Presupuesto">
             {PRICE_FILTERS.map((p) => {
               const on = filters.price === p.id;
               return (
@@ -166,25 +196,27 @@ export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocus
               );
             })}
           </Group>
-          <Group title="Fecha">
+          <div className="flex items-center justify-between gap-2 pt-1">
             <input
               type="date"
               value={customDate}
               onChange={(e) => onChange({ ...filters, when: e.target.value })}
-              className="h-9 rounded-lg border border-line bg-ink px-3 font-mono text-xs text-fg focus:border-white/25 focus:outline-none"
+              className="h-8 rounded-lg border border-line bg-ink px-2.5 font-mono text-xs text-fg focus:border-white/25 focus:outline-none"
             />
-          </Group>
+            {activeCount > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(EMPTY_FILTERS);
+                  setMore(false);
+                }}
+                className="text-xs font-medium text-accent hover:underline"
+              >
+                Limpiar todo
+              </button>
+            )}
+          </div>
         </div>
-      )}
-
-      {activeCount > 0 && (
-        <button
-          type="button"
-          onClick={() => onChange(EMPTY_FILTERS)}
-          className="text-xs font-medium text-muted underline-offset-4 hover:text-fg hover:underline"
-        >
-          Limpiar {activeCount} {activeCount === 1 ? "filtro" : "filtros"}
-        </button>
       )}
     </div>
   );
@@ -193,7 +225,7 @@ export function FilterBar({ filters, activeZone, onChange, onSelectZone, onFocus
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted">{title}</p>
+      <p className="mb-1.5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted">{title}</p>
       <div className="flex flex-wrap gap-1.5">{children}</div>
     </div>
   );

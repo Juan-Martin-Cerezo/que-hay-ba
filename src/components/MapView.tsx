@@ -65,44 +65,69 @@ interface MapViewProps {
   onSelectEvent: (ev: MapEventProperties) => void;
 }
 
-const ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services";
-const RASTERS: Record<string, { tiles: string[]; scheme?: "tms"; attribution?: string }> = {
-  dark: { tiles: [`${ESRI}/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}`], attribution: "© Esri · OpenStreetMap" },
-  "dark-ref": { tiles: [`${ESRI}/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}`] },
-  voyager: { tiles: [`${ESRI}/World_Topo_Map/MapServer/tile/{z}/{y}/{x}`], attribution: "© Esri · OpenStreetMap" },
-  light: { tiles: [`${ESRI}/World_Street_Map/MapServer/tile/{z}/{y}/{x}`], attribution: "© Esri · OpenStreetMap" },
+const CARTO_SUBS = ["a", "b", "c", "d"];
+const RASTERS: Record<
+  MapThemeId,
+  { tiles: string[]; scheme?: "tms"; maxzoom: number; attribution: string }
+> = {
+  dark: {
+    tiles: CARTO_SUBS.map((s) => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png`),
+    maxzoom: 19,
+    attribution: "© OpenStreetMap · © CARTO",
+  },
   osm: {
     tiles: [
       "https://servicios.usig.buenosaires.gob.ar/mapcache/tms/1.0.0/amba_con_transporte_3857@GoogleMapsCompatible/{z}/{x}/{y}.png",
     ],
     scheme: "tms",
+    maxzoom: 18,
     attribution: "© USIG · GCBA",
+  },
+  voyager: {
+    tiles: CARTO_SUBS.map((s) => `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png`),
+    maxzoom: 19,
+    attribution: "© OpenStreetMap · © CARTO",
+  },
+  light: {
+    tiles: CARTO_SUBS.map((s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png`),
+    maxzoom: 19,
+    attribution: "© OpenStreetMap · © CARTO",
   },
 };
 
-// Layer id → which theme shows it.
-const LAYER_THEME: Record<string, MapThemeId> = {
-  dark: "dark",
-  "dark-ref": "dark",
-  voyager: "voyager",
-  light: "light",
-  osm: "osm",
-};
-
 function buildStyle(theme: MapThemeId): StyleSpecification {
-  const ids = Object.keys(RASTERS);
+  const ids = Object.keys(RASTERS) as MapThemeId[];
   return {
     version: 8,
     sources: Object.fromEntries(
-      ids.map((id) => [id, { type: "raster", tileSize: 256, ...RASTERS[id] }])
+      ids.map((id) => [
+        id,
+        {
+          type: "raster",
+          tileSize: 256,
+          tiles: RASTERS[id].tiles,
+          maxzoom: RASTERS[id].maxzoom,
+          ...(RASTERS[id].scheme ? { scheme: RASTERS[id].scheme } : {}),
+          attribution: RASTERS[id].attribution,
+        },
+      ])
     ) as StyleSpecification["sources"],
-    layers: ids.map((id) => ({
-      id: `layer-${id}`,
-      type: "raster" as const,
-      source: id,
-      layout: { visibility: LAYER_THEME[id] === theme ? ("visible" as const) : ("none" as const) },
-      paint: id === "dark" ? { "raster-contrast": 0.12, "raster-brightness-min": 0.04 } : {},
-    })),
+    layers: [
+      {
+        id: "bg-obsidian",
+        type: "background",
+        paint: { "background-color": "#09090b" },
+      },
+      ...ids.map((id) => ({
+        id: `layer-${id}`,
+        type: "raster" as const,
+        source: id,
+        minzoom: 0,
+        maxzoom: 22,
+        layout: { visibility: id === theme ? ("visible" as const) : ("none" as const) },
+        paint: { "raster-fade-duration": 150 },
+      })),
+    ],
   };
 }
 
@@ -114,11 +139,12 @@ function clip(s: string, n: number): string {
   return s.length > n ? `${s.slice(0, n - 1).trim()}…` : s;
 }
 
-/** Map padding so fly-to targets stay clear of the panel (left on desktop, bottom sheet on mobile). */
+/** Map padding so fly-to targets stay clear of the sidebar (md+) or mobile sheets. */
 function panelPadding() {
-  return window.innerWidth >= 1024
-    ? { top: 24, right: 24, bottom: 24, left: 404 }
-    : { top: 72, right: 16, bottom: 200, left: 16 };
+  if (typeof window === "undefined") return { top: 24, right: 24, bottom: 24, left: 24 };
+  return window.innerWidth >= 768
+    ? { top: 32, right: 32, bottom: 32, left: 420 }
+    : { top: 140, right: 16, bottom: 190, left: 16 };
 }
 
 export function MapView({
@@ -167,7 +193,7 @@ export function MapView({
         center: [-58.41, -34.6037],
         zoom: 12.6,
         minZoom: 10.5,
-        maxZoom: 18.5,
+        maxZoom: 20,
         maxBounds: [
           [-58.62, -34.76],
           [-58.26, -34.49],
@@ -180,7 +206,7 @@ export function MapView({
     }
 
     map.addControl(new AttributionControl({ compact: true }), "bottom-right");
-    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+    map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.setPadding(panelPadding());
 
     const bump = () => setTick((t) => t + 1);
@@ -220,7 +246,7 @@ export function MapView({
     const b = map.getBounds();
     const zoom = map.getZoom();
     const detailed = zoom >= 13.6;
-    const cap = zoom >= 15 ? 140 : zoom >= 13.6 ? 90 : 220;
+    const cap = zoom >= 15 ? 150 : zoom >= 13.6 ? 95 : 180;
 
     const visible = groups
       .filter((g) => g.lng >= b.getWest() && g.lng <= b.getEast() && g.lat >= b.getSouth() && g.lat <= b.getNorth())
@@ -243,15 +269,14 @@ export function MapView({
 
       const el = document.createElement("button");
       el.type = "button";
-      el.className = "qhba-pin";
       el.setAttribute("aria-label", n > 1 ? `${n} experiencias en ${g.venueName}` : first.title);
-      el.style.cssText = `display:block;background:none;border:0;padding:0;cursor:pointer;z-index:${selected ? 30 : hovered ? 20 : n > 1 ? 2 : 1};`;
+      el.style.cssText = `background:none;border:0;padding:0;cursor:pointer;z-index:${selected ? 30 : hovered ? 20 : n > 1 ? 2 : 1};`;
 
       if (!detailed && !selected && !hovered) {
         // Overview: compact icon globito with count badge for multi-experience venues.
         el.innerHTML = `
-          <span style="display:flex;flex-direction:column;align-items:center">
-            <span style="display:flex;align-items:center;gap:4px;height:26px;padding:0 ${n > 1 || free ? "8px" : "6px"};border-radius:999px;background:#111113;border:1.5px solid ${cat.color};color:#ededef;box-shadow:0 6px 16px -4px rgba(0,0,0,.75);font:600 11px var(--ff-mono),monospace">
+          <span class="qhba-pin-inner" style="display:flex;flex-direction:column;align-items:center">
+            <span style="display:flex;align-items:center;gap:4px;height:26px;padding:0 ${n > 1 || free ? "8px" : "6px"};border-radius:999px;background:#111113;border:1.5px solid ${cat.color};color:#ededef;box-shadow:0 6px 16px -4px rgba(0,0,0,.85);font:600 11px var(--ff-mono),monospace">
               <span style="font-size:12px;line-height:1">${cat.emoji}</span>
               ${n > 1 ? `<span>×${n}</span>` : ""}
               ${free && n === 1 ? `<span style="font-size:9.5px;color:#34d399">$0</span>` : ""}
@@ -261,11 +286,11 @@ export function MapView({
       } else {
         const bg = selected ? "#f5b84a" : "#111113";
         const fg = selected ? "#09090b" : "#ededef";
-        const border = selected ? "#f5b84a" : hovered ? "#ededef" : `${cat.color}88`;
+        const border = selected ? "#f5b84a" : hovered ? "#ededef" : `${cat.color}99`;
         const label = n > 1 ? clip(g.venueName, 20) : clip(first.title, 22);
         el.innerHTML = `
-          <span style="display:flex;flex-direction:column;align-items:center;transform:${hovered && !selected ? "translateY(-2px)" : "none"};transition:transform .15s">
-            <span style="display:flex;align-items:center;gap:6px;padding:4px 10px 4px 5px;border-radius:999px;background:${bg};color:${fg};border:1.5px solid ${border};box-shadow:0 10px 24px -6px rgba(0,0,0,.8);white-space:nowrap;font:600 11.5px var(--ff-sans),sans-serif;letter-spacing:-.01em">
+          <span class="qhba-pin-inner" style="display:flex;flex-direction:column;align-items:center;transform:${hovered && !selected ? "translateY(-2px)" : "none"};transition:transform .15s">
+            <span style="display:flex;align-items:center;gap:6px;padding:4px 10px 4px 5px;border-radius:999px;background:${bg};color:${fg};border:1.5px solid ${border};box-shadow:0 10px 24px -6px rgba(0,0,0,.85);white-space:nowrap;font:600 11.5px var(--ff-sans),sans-serif;letter-spacing:-.01em">
               <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:${selected ? "#09090b22" : `${cat.color}26`};font-size:11.5px;line-height:1">${cat.emoji}</span>
               <span>${esc(label)}</span>
               ${n > 1 ? `<span style="padding:1px 5px;border-radius:999px;background:${selected ? "#09090b1f" : "rgba(255,255,255,.09)"};font:600 10px var(--ff-mono),monospace">×${n}</span>` : ""}
@@ -331,7 +356,7 @@ export function MapView({
     if (!map) return;
     for (const id of Object.keys(RASTERS)) {
       if (map.getLayer(`layer-${id}`)) {
-        map.setLayoutProperty(`layer-${id}`, "visibility", LAYER_THEME[id] === mapTheme ? "visible" : "none");
+        map.setLayoutProperty(`layer-${id}`, "visibility", id === mapTheme ? "visible" : "none");
       }
     }
   }, [mapTheme]);

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { CATEGORY_IDS, type CategoryId } from "@/lib/domain";
 import { computeTimeWindow, formatPriceLabel } from "@/ingest/normalise";
+import { ensureFreshEvents } from "@/ingest/run";
 
 export interface EventRow {
   id: number;
@@ -32,6 +33,8 @@ export async function GET(req: NextRequest) {
   const catParam = sp.get("cat") ?? "";
   const when = sp.get("when") ?? "";
   const q = (sp.get("q") ?? "").trim();
+
+  await ensureFreshEvents();
 
   const categories = catParam
     .split(",")

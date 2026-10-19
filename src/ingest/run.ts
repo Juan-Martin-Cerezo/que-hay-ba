@@ -125,16 +125,24 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
       upserted++;
     }
 
-    // Prune events that ended more than 2 days ago.
-    const prunedRows = await db<{ id: number }[]>`
-      delete from events
-      where starts_at < now() - interval '2 days'
+    // Perpetual rolling schedule: instead of deleting past events, roll any elapsed
+    // event forward in 7-day increments so day-of-week and hour stay accurate forever.
+    const rolledRows = await db<{ id: number }[]>`
+      update events
+      set
+        starts_at = starts_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0))),
+        ends_at = case
+          when ends_at is not null then ends_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0)))
+          else null
+        end,
+        last_seen_at = now()
+      where starts_at < now() - interval '2 hours'
       returning id
     `;
 
     await db`
       update ingest_runs
-      set finished_at = now(), ok = true, fetched = ${rawEvents.length}, upserted = ${upserted}, pruned = ${prunedRows.length}
+      set finished_at = now(), ok = true, fetched = ${rawEvents.length}, upserted = ${upserted}, pruned = ${rolledRows.length}
       where id = ${runId}
     `;
 
@@ -142,7 +150,7 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
       source,
       fetched: rawEvents.length,
       upserted,
-      pruned: prunedRows.length,
+      pruned: rolledRows.length,
       durationMs: Date.now() - started,
     };
   } catch (err) {
@@ -153,5 +161,55 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
       where id = ${runId}
     `;
     throw err;
+  }
+}
+
+let lastMaintenanceAt = 0;
+let isRefreshingBg = false;
+const SOURCES_CYCLE: SourceId[] = ["gcba", "alternativa", "eventbrite"];
+let sourceCursor = 0;
+
+/**
+ * Self-healing perpetual event engine:
+ * 1. Rolls any past events forward by 7-day multiples so the schedule never empties ("por toda la eternidad").
+ * 2. Triggers non-blocking background scraping whenever the last ingest run is > 30 minutes old.
+ */
+export async function ensureFreshEvents(): Promise<void> {
+  const now = Date.now();
+  if (now - lastMaintenanceAt < 3 * 60 * 1000) return;
+  lastMaintenanceAt = now;
+
+  const db = sql();
+  try {
+    await db`
+      update events
+      set
+        starts_at = starts_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0))),
+        ends_at = case
+          when ends_at is not null then ends_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0)))
+          else null
+        end,
+        last_seen_at = now()
+      where starts_at < now() - interval '2 hours'
+    `;
+
+    if (!isRefreshingBg) {
+      const [latest] = await db<{ started_at: string }[]>`
+        select started_at from ingest_runs order by started_at desc limit 1
+      `;
+      const ageMs = latest ? now - new Date(latest.started_at).getTime() : Infinity;
+      if (ageMs > 30 * 60 * 1000) {
+        isRefreshingBg = true;
+        const nextSource = SOURCES_CYCLE[sourceCursor % SOURCES_CYCLE.length];
+        sourceCursor++;
+        void ingestSource(nextSource, { enrichLimit: 18 })
+          .catch(() => {})
+          .finally(() => {
+            isRefreshingBg = false;
+          });
+      }
+    }
+  } catch {
+    // Non-fatal maintenance error; query proceeds normally.
   }
 }
