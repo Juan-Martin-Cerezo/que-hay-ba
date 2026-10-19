@@ -65,15 +65,14 @@ interface MapViewProps {
   onSelectEvent: (ev: MapEventProperties) => void;
 }
 
-const CARTO_SUBS = ["a", "b", "c", "d"];
 const RASTERS: Record<
   MapThemeId,
   { tiles: string[]; scheme?: "tms"; maxzoom: number; attribution: string }
 > = {
   dark: {
-    tiles: CARTO_SUBS.map((s) => `https://${s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png`),
+    tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
     maxzoom: 19,
-    attribution: "© OpenStreetMap · © CARTO",
+    attribution: "© OpenStreetMap contributors",
   },
   osm: {
     tiles: [
@@ -84,14 +83,17 @@ const RASTERS: Record<
     attribution: "© USIG · GCBA",
   },
   voyager: {
-    tiles: CARTO_SUBS.map((s) => `https://${s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}@2x.png`),
-    maxzoom: 19,
-    attribution: "© OpenStreetMap · © CARTO",
+    tiles: [
+      "https://servicios.usig.buenosaires.gob.ar/mapcache/tms/1.0.0/amba_con_transporte_3857@GoogleMapsCompatible/{z}/{x}/{y}.png",
+    ],
+    scheme: "tms",
+    maxzoom: 18,
+    attribution: "© USIG · GCBA",
   },
   light: {
-    tiles: CARTO_SUBS.map((s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png`),
+    tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
     maxzoom: 19,
-    attribution: "© OpenStreetMap · © CARTO",
+    attribution: "© OpenStreetMap contributors",
   },
 };
 
@@ -397,7 +399,7 @@ export function MapView({
     );
   }
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  return <div ref={containerRef} data-map-theme={mapTheme} className="absolute inset-0" />;
 }
 
 // Kept for API compatibility with callers that import the source type.

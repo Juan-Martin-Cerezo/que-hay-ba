@@ -39,6 +39,14 @@ body {
   height: 100% !important;
 }
 
+/* Keyless dark-mode cartography: filters ONLY the WebGL tile canvas, leaving HTML globito markers untouched */
+[data-map-theme="dark"] .maplibregl-canvas {
+  filter: invert(1) hue-rotate(180deg) brightness(0.86) contrast(1.12) saturate(0.65);
+}
+[data-map-theme="voyager"] .maplibregl-canvas {
+  filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(1.06) saturate(0.8);
+}
+
 /* Minimal dark map controls */
 .maplibregl-ctrl-group {
   background: rgba(17, 17, 19, 0.92) !important;
