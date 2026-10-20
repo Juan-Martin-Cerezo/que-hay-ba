@@ -72,7 +72,7 @@ export type MapThemeId = "voyager" | "light" | "dark" | "osm";
 
 export const MAP_THEMES: ReadonlyArray<{ id: MapThemeId; label: string }> = [
   { id: "dark", label: "Noche" },
-  { id: "osm", label: "Subte" },
+  { id: "osm", label: "Día" },
   { id: "voyager", label: "Relieve" },
   { id: "light", label: "Calles" },
 ];
