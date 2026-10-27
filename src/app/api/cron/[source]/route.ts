@@ -10,9 +10,10 @@ export async function GET(
   req: NextRequest,
   ctx: { params: Promise<{ source: string }> }
 ) {
+  // Fail closed: an unset CRON_SECRET must not turn the ingest into a public endpoint.
   const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -39,6 +39,16 @@ interface GcbaResponse {
 
 const BASE = "https://linda.buenosaires.gob.ar";
 
+/**
+ * Linda's API advertises /descubrir/<slug> for events, but that route is gone:
+ * the public page lives at /eventos/<slug>.
+ */
+export function gcbaEventUrl(pathAlias?: string | null, slug?: string | null): string {
+  const raw = pathAlias || (slug ? `/descubrir/${slug}` : "/agenda");
+  const path = raw.replace("/descubrir/", "/eventos/");
+  return path.startsWith("http") ? path : `${BASE}${path}`;
+}
+
 export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
   const results: RawEvent[] = [];
   const now = Date.now();
@@ -102,8 +112,7 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
         }
       }
 
-      const urlPath = ev.pathAlias || (ev.slug ? `/descubrir/${ev.slug}` : "/agenda");
-      const officialUrl = urlPath.startsWith("http") ? urlPath : `${BASE}${urlPath}`;
+      const officialUrl = gcbaEventUrl(ev.pathAlias, ev.slug);
       const barrio = ev.barrio ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : null;
       const cats = [...(ev.etiquetas ?? []), ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : [])];
 

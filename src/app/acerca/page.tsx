@@ -54,15 +54,7 @@ export default function AcercaPage() {
           >
             OpenStreetMap
           </a>
-          ,{" "}
-          <a
-            href="https://carto.com/attributions"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent underline underline-offset-4"
-          >
-            CARTO
-          </a>{" "}
+          {" "}
           y el servicio oficial de normalización geográfica{" "}
           <a
             href="https://servicios.usig.buenosaires.gob.ar"

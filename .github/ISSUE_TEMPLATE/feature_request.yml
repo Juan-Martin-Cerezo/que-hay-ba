@@ -1,0 +1,30 @@
+name: Idea
+description: Una fuente nueva, una mejora o un cambio de comportamiento
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Qué problema resuelve
+      description: Describí el caso de uso antes de la solución.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Cómo lo imaginas
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Mapa
+        - Filtros o cartelera
+        - Ingesta de datos
+        - API
+        - Documentación
+        - Otro
+    validations:
+      required: true

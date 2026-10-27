@@ -43,12 +43,10 @@ export function EventSheet({
   onToggleFavorite,
 }: EventSheetProps) {
   const [detail, setDetail] = useState<EventDetail | null>(null);
-  const [imgFailed, setImgFailed] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [imgFailedFor, setImgFailedFor] = useState<number | null>(null);
+  const [copiedFor, setCopiedFor] = useState<number | null>(null);
 
   useEffect(() => {
-    setImgFailed(false);
-    setCopied(false);
     if (!event) return;
     let cancelled = false;
     fetch(`/api/events/${event.id}`)
@@ -69,6 +67,8 @@ export function EventSheet({
 
   if (!event) return null;
   const ev = detail && detail.id === event.id ? detail : event;
+  const imgFailed = imgFailedFor === event.id;
+  const copied = copiedFor === event.id;
   const cat = categoryById[ev.category] ?? categoryById.arte;
   const dist = userLocation ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng) : null;
 
@@ -84,8 +84,8 @@ export function EventSheet({
     }
     try {
       await navigator.clipboard.writeText(`${text} ${ev.url}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedFor(ev.id);
+      setTimeout(() => setCopiedFor((current) => (current === ev.id ? null : current)), 2000);
     } catch {
       /* ignore */
     }
@@ -114,7 +114,7 @@ export function EventSheet({
       <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-raised">
         {ev.imageUrl && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={ev.imageUrl} alt="" onError={() => setImgFailed(true)} className="h-full w-full object-cover" />
+          <img src={ev.imageUrl} alt="" onError={() => setImgFailedFor(ev.id)} className="h-full w-full object-cover" />
         ) : (
           <div
             className="flex h-full w-full items-end p-5"

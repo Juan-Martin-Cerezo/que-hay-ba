@@ -172,7 +172,7 @@ export function MapView({
     onSelectRef.current = onSelectEvent;
   }, [onSelectEvent]);
 
-  // Experiences sharing the same venue collapse into one globito.
+  // Events at the same venue collapse into a single marker.
   const groups = useMemo<VenueGroup[]>(() => {
     const byKey = new Map<string, VenueGroup>();
     for (const f of data.features) {
@@ -203,7 +203,8 @@ export function MapView({
         attributionControl: false,
       });
     } catch {
-      setWebglError(true);
+      // MapLibre throws when no WebGL context is available.
+      requestAnimationFrame(() => setWebglError(true));
       return;
     }
 
@@ -236,12 +237,7 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Re-render globitos when data changes (new filter result).
-  useEffect(() => {
-    setTick((t) => t + 1);
-  }, [data]);
-
-  // Globitos: HTML markers, one per venue, limited to the viewport.
+  // One HTML marker per venue, limited to the viewport and to a zoom-based cap.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -316,7 +312,7 @@ export function MapView({
     }
   }, [groups, tick, selectedId, hoveredId]);
 
-  // Stack popover listing every experience at one venue.
+  // Popover listing every event at one venue.
   useEffect(() => {
     stackRef.current?.remove();
     stackRef.current = null;
