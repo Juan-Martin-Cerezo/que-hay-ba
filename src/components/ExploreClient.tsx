@@ -332,7 +332,7 @@ export function ExploreClient() {
             </h1>
             <span className="flex items-center gap-1 font-mono text-[10px] text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {data.total}
+              {data.total.toLocaleString("es-AR")}
             </span>
           </div>
           <div className="flex items-center gap-1.5">

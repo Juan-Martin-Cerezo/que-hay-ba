@@ -254,7 +254,8 @@ export function MapView({
     const b = map.getBounds();
     const zoom = map.getZoom();
     const detailed = zoom >= 13.6;
-    const cap = zoom >= 15 ? 150 : zoom >= 13.6 ? 95 : 180;
+    // Fewer pins at low zoom: 180 markers over the whole city read as noise.
+    const cap = zoom >= 15 ? 120 : zoom >= 13.6 ? 80 : 48;
 
     const visible = groups
       .filter(
