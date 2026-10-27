@@ -9,7 +9,10 @@ export const CABA_BBOX = {
   maxLng: -58.334,
 } as const;
 
-export function isInsideCaba(lat: number | null | undefined, lng: number | null | undefined): boolean {
+export function isInsideCaba(
+  lat: number | null | undefined,
+  lng: number | null | undefined
+): boolean {
   if (typeof lat !== "number" || typeof lng !== "number") return false;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
   return (
@@ -66,7 +69,10 @@ export function parsePrice(
   }
   if (typeof explicitMin === "number" && Number.isFinite(explicitMin)) {
     const min = Math.round(explicitMin);
-    const max = typeof explicitMax === "number" && Number.isFinite(explicitMax) ? Math.round(explicitMax) : min;
+    const max =
+      typeof explicitMax === "number" && Number.isFinite(explicitMax)
+        ? Math.round(explicitMax)
+        : min;
     if (min <= 0 && max <= 0) return { isFree: true, priceMin: 0, priceMax: 0 };
     return { isFree: false, priceMin: min, priceMax: Math.max(min, max) };
   }
@@ -74,13 +80,17 @@ export function parsePrice(
   const raw = text ?? "";
   const n = normText(raw);
   if (
-    /\b(gratis|gratuito|gratuita|entrada libre|sin cargo|sin costo|libre y gratuit[oa]|a la gorra)\b/.test(n)
+    /\b(gratis|gratuito|gratuita|entrada libre|sin cargo|sin costo|libre y gratuit[oa]|a la gorra)\b/.test(
+      n
+    )
   ) {
     return { isFree: true, priceMin: 0, priceMax: 0 };
   }
 
   // Extract ARS amounts such as "$ 10.000,00", "$8.000 / $12.000", "$15000", "ARS 25.000".
-  const matches = [...raw.matchAll(/(?:\$|ars)\s*([0-9]{1,3}(?:[.\s][0-9]{3})+|[0-9]{3,7})(?:,[0-9]{1,2})?/gi)];
+  const matches = [
+    ...raw.matchAll(/(?:\$|ars)\s*([0-9]{1,3}(?:[.\s][0-9]{3})+|[0-9]{3,7})(?:,[0-9]{1,2})?/gi),
+  ];
   const values: number[] = [];
   for (const m of matches) {
     const digits = m[1].replace(/[.\s]/g, "");
@@ -98,7 +108,11 @@ export function parsePrice(
   return { isFree: false, priceMin: null, priceMax: null };
 }
 
-export function formatPriceLabel(isFree: boolean, priceMin: number | null, priceMax: number | null): string {
+export function formatPriceLabel(
+  isFree: boolean,
+  priceMin: number | null,
+  priceMax: number | null
+): string {
   if (isFree) return "Gratis";
   if (priceMin == null) return "Precio a confirmar";
   const fmt = (n: number) => "$" + n.toLocaleString("es-AR");
@@ -174,13 +188,19 @@ export function classifyEvent(
       best = cat;
     }
   }
-  return bestScore > 0 ? best : defaultCategory ?? "arte";
+  return bestScore > 0 ? best : (defaultCategory ?? "arte");
 }
 
 export function makeVenueKey(name: string, address?: string | null): string {
-  const n = normText(name).replace(/\b(teatro|centro cultural|espacio|sala|club|bar|museo)\b/g, "").trim() || normText(name);
+  const n =
+    normText(name)
+      .replace(/\b(teatro|centro cultural|espacio|sala|club|bar|museo)\b/g, "")
+      .trim() || normText(name);
   const a = normText(address ?? "")
-    .replace(/\b(av|avenida|calle|buenos aires|caba|cdad autonoma de buenos aires|argentina)\b/g, "")
+    .replace(
+      /\b(av|avenida|calle|buenos aires|caba|cdad autonoma de buenos aires|argentina)\b/g,
+      ""
+    )
     .trim();
   const numMatch = a.match(/\b(\d{2,5})\b/);
   const streetToken = a.split(" ").find((t) => t.length >= 4 && !/^\d+$/.test(t));
@@ -206,10 +226,7 @@ export function makeDedupKey(title: string, venueKey: string, startsAt: Date): s
 
 export function makeGroupKey(title: string, venueKey: string): string {
   const cleanTitle = normText(title).slice(0, 60);
-  return createHash("sha1")
-    .update(`${cleanTitle}|${venueKey}`)
-    .digest("hex")
-    .slice(0, 20);
+  return createHash("sha1").update(`${cleanTitle}|${venueKey}`).digest("hex").slice(0, 20);
 }
 
 // Parse local Buenos Aires date/time ("2026-10-30", "21:00") into a UTC Date.
@@ -245,7 +262,10 @@ export function computeTimeWindow(
     };
   }
   if (when === "today") {
-    return { from: new Date(Math.max(now.getTime() - 2 * 3600_000, todayStart.getTime())), to: todayEnd };
+    return {
+      from: new Date(Math.max(now.getTime() - 2 * 3600_000, todayStart.getTime())),
+      to: todayEnd,
+    };
   }
   if (when === "weekend") {
     const dow = art.getUTCDay(); // 0=Sun..6=Sat
@@ -257,7 +277,10 @@ export function computeTimeWindow(
 
     const friStart = new Date(todayStart.getTime() + daysToFri * 86_400_000);
     const sunEnd = new Date(friStart.getTime() + 3 * 86_400_000 - 1000);
-    return { from: new Date(Math.max(now.getTime() - 2 * 3600_000, friStart.getTime())), to: sunEnd };
+    return {
+      from: new Date(Math.max(now.getTime() - 2 * 3600_000, friStart.getTime())),
+      to: sunEnd,
+    };
   }
   if (when && /^\d{4}-\d{2}-\d{2}$/.test(when)) {
     const dayStart = new Date(`${when}T00:00:00-03:00`);

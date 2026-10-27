@@ -20,7 +20,9 @@ async function main() {
   if (migrate) {
     const dir = join(process.cwd(), "supabase/migrations");
     // Migrations are written to be re-runnable, so every deploy applies all of them in order.
-    const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
     for (const file of files) {
       await db.unsafe(readFileSync(join(dir, file), "utf8"));
       console.log(`✓ Applied supabase/migrations/${file}`);
@@ -33,9 +35,7 @@ async function main() {
   }
 
   const sources: SourceId[] =
-    sourceArg === "all"
-      ? ["gcba", "eventbrite", "alternativa"]
-      : ([sourceArg] as SourceId[]);
+    sourceArg === "all" ? ["gcba", "eventbrite", "alternativa"] : ([sourceArg] as SourceId[]);
 
   for (const s of sources) {
     console.log(`→ Ingesting ${s}...`);

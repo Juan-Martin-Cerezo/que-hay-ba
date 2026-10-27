@@ -11,13 +11,13 @@ fuentes externas ──► src/ingest ──► Postgres ──► /api/events �
 
 ## Modelo de datos
 
-| Tabla | Rol |
-| --- | --- |
-| `events` | Un registro por función. `dedup_key` único, `group_key` agrupa las repeticiones de la misma obra en la misma sala. |
-| `venues` | Sedes con coordenadas. `key` es `nombre\|dirección` normalizado. |
-| `detail_cache` | Ficha enriquecida por función (precio, sinopsis) para no repetir el fetch. |
-| `geocode_cache` | Dirección → coordenadas, para no volver a geocodificar. |
-| `ingest_runs` | Una fila por corrida, con contadores y error. Es el histórico de salud del pipeline. |
+| Tabla           | Rol                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `events`        | Un registro por función. `dedup_key` único, `group_key` agrupa las repeticiones de la misma obra en la misma sala. |
+| `venues`        | Sedes con coordenadas. `key` es `nombre\|dirección` normalizado.                                                   |
+| `detail_cache`  | Ficha enriquecida por función (precio, sinopsis) para no repetir el fetch.                                         |
+| `geocode_cache` | Dirección → coordenadas, para no volver a geocodificar.                                                            |
+| `ingest_runs`   | Una fila por corrida, con contadores y error. Es el histórico de salud del pipeline.                               |
 
 Las cinco tablas tienen RLS activo y sin políticas: la app se conecta con el rol de servicio y todo el tráfico pasa por el servidor. No hay acceso anónimo a la base.
 
@@ -27,11 +27,11 @@ Las cinco tablas tienen RLS activo y sin políticas: la app se conecta con el ro
 
 Cada fuente implementa el mismo contrato (`RawEvent` en `src/ingest/types.ts`) y tiene su propio parser:
 
-| Archivo | Origen | Estrategia |
-| --- | --- | --- |
-| `sources/gcba.ts` | API pública de Linda (GCBA) | JSON paginado. Usa `fechasDelEvento` y, para muestras largas, ancla la función al día de hoy. Reescribe `/descubrir/` a `/eventos/`, la ruta que la API todavía anuncia mal. |
-| `sources/alternativa.ts` | Cartelera de Alternativa Teatral | Abre sesión en `cartelera.asp`, pide el JSON de la cartelera y enriquece cada obra con su ficha individual, con caché en `detail_cache`. |
-| `sources/eventbrite.ts` | API pública de destinos de Eventbrite | Búsqueda por bounding box de CABA, enriquece precios con el endpoint de disponibilidad. |
+| Archivo                  | Origen                                | Estrategia                                                                                                                                                                   |
+| ------------------------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sources/gcba.ts`        | API pública de Linda (GCBA)           | JSON paginado. Usa `fechasDelEvento` y, para muestras largas, ancla la función al día de hoy. Reescribe `/descubrir/` a `/eventos/`, la ruta que la API todavía anuncia mal. |
+| `sources/alternativa.ts` | Cartelera de Alternativa Teatral      | Abre sesión en `cartelera.asp`, pide el JSON de la cartelera y enriquece cada obra con su ficha individual, con caché en `detail_cache`.                                     |
+| `sources/eventbrite.ts`  | API pública de destinos de Eventbrite | Búsqueda por bounding box de CABA, enriquece precios con el endpoint de disponibilidad.                                                                                      |
 
 Detalle de términos, atribución y fragilidad de cada fuente en [`DATA-SOURCES.md`](DATA-SOURCES.md).
 

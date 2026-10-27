@@ -119,7 +119,9 @@ export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
       const candidateDates = (ev.fechasDelEvento?.length ? ev.fechasDelEvento : [ev.fechaInicio])
         .filter((d): d is string => Boolean(d))
         .map((d) => new Date(d))
-        .filter((d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime)
+        .filter(
+          (d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime
+        )
         .sort((a, b) => a.getTime() - b.getTime());
 
       // If fechaInicio is in the past (long-running exhibition) but fechaFin is in the future, anchor to today 14:00 ART.
@@ -132,8 +134,13 @@ export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
       }
 
       const officialUrl = gcbaEventUrl(ev.pathAlias, ev.slug);
-      const barrio = ev.barrio ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : null;
-      const cats = [...(ev.etiquetas ?? []), ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : [])];
+      const barrio = ev.barrio
+        ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : null;
+      const cats = [
+        ...(ev.etiquetas ?? []),
+        ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : []),
+      ];
 
       for (const startsAt of candidateDates.slice(0, 3)) {
         results.push({

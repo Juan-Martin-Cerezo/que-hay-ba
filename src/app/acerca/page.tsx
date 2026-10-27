@@ -53,8 +53,7 @@ export default function AcercaPage() {
             className="text-accent underline underline-offset-4"
           >
             OpenStreetMap
-          </a>
-          {" "}
+          </a>{" "}
           y el servicio oficial de normalización geográfica{" "}
           <a
             href="https://servicios.usig.buenosaires.gob.ar"

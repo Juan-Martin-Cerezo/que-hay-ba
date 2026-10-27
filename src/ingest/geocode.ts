@@ -51,7 +51,9 @@ export async function resolveCoords(
   }
 
   // 4. USIG (GCBA official address normaliser + geocoder, WGS84).
-  const rawAddress = (address || venueName).replace(/,?\s*(caba|capital federal|buenos aires).*$/i, "").trim();
+  const rawAddress = (address || venueName)
+    .replace(/,?\s*(caba|capital federal|buenos aires).*$/i, "")
+    .trim();
   const coords = (await geocodeUsig(rawAddress)) ?? (await geocodeNominatim(rawAddress));
 
   await db`
@@ -105,7 +107,10 @@ async function geocodeNominatim(address: string): Promise<{ lat: number; lng: nu
       q
     )}`;
     const res = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "QueHayBA/1.0 (+https://que-hay-ba.vercel.app)" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "QueHayBA/1.0 (+https://que-hay-ba.vercel.app)",
+      },
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return null;

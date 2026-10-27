@@ -56,8 +56,11 @@ async function fetchShowDetail(urlPath: string): Promise<{
       "";
     const parsed = parsePrice(priceLine);
 
-    const ogDesc = html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ?? "";
-    const cleanedDesc = stripHtml(ogDesc.replace(/\s*en Alternativa\. Comunidad en escena\.?$/i, "")).trim();
+    const ogDesc =
+      html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ?? "";
+    const cleanedDesc = stripHtml(
+      ogDesc.replace(/\s*en Alternativa\. Comunidad en escena\.?$/i, "")
+    ).trim();
 
     return {
       isFree: parsed.isFree,
@@ -102,13 +105,15 @@ export async function fetchAlternativaEvents(enrichLimit = 35): Promise<RawEvent
 
   // Step 2: load cached show details from Postgres.
   const db = sql();
-  const cachedRows = await db<{
-    source_id: string;
-    is_free: boolean | null;
-    price_min: number | null;
-    price_max: number | null;
-    description: string | null;
-  }[]>`
+  const cachedRows = await db<
+    {
+      source_id: string;
+      is_free: boolean | null;
+      price_min: number | null;
+      price_max: number | null;
+      description: string | null;
+    }[]
+  >`
     select source_id, is_free, price_min, price_max, description
     from detail_cache
     where source = 'alternativa'

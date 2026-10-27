@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const price = sp.get("price") ?? "";
   const catParam = sp.get("cat") ?? "";
   const when = sp.get("when") ?? "";
-  const q = (sp.get("q") ?? "").trim();
+  const q = (sp.get("q") ?? "").trim().slice(0, 80);
 
   await ensureFreshEvents();
 

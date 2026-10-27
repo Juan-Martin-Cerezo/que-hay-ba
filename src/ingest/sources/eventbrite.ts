@@ -83,7 +83,8 @@ export async function fetchEventbriteEvents(): Promise<RawEvent[]> {
     try {
       const res = await fetch(pageUrl, {
         headers: {
-          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
+          "User-Agent":
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36",
           Accept: "text/html,application/xhtml+xml",
           "Accept-Language": "es-AR,es;q=0.9",
         },
@@ -109,7 +110,10 @@ export async function fetchEventbriteEvents(): Promise<RawEvent[]> {
       for (const e of collected) {
         if (!e?.id || e.is_online_event || e.is_cancelled) continue;
         const prev = byId.get(e.id);
-        byId.set(e.id, { ev: prev?.ev ?? e, forcedFree: Boolean(prev?.forcedFree || isFreeListing) });
+        byId.set(e.id, {
+          ev: prev?.ev ?? e,
+          forcedFree: Boolean(prev?.forcedFree || isFreeListing),
+        });
       }
     } catch {
       // Continue with remaining pages if one times out.
@@ -146,7 +150,11 @@ export async function fetchEventbriteEvents(): Promise<RawEvent[]> {
   const out: RawEvent[] = [];
   for (const [id, { ev: base, forcedFree }] of byId.entries()) {
     const rich = enriched.get(id);
-    const ev: EbEvent = { ...base, ...rich, primary_venue: rich?.primary_venue ?? base.primary_venue };
+    const ev: EbEvent = {
+      ...base,
+      ...rich,
+      primary_venue: rich?.primary_venue ?? base.primary_venue,
+    };
     const title = (ev.name ?? "").trim();
     if (!title || !ev.start_date || !ev.url) continue;
 
@@ -163,7 +171,11 @@ export async function fetchEventbriteEvents(): Promise<RawEvent[]> {
     const isFree = Boolean(forcedFree || ta?.is_free);
     let priceMin: number | null = isFree ? 0 : null;
     let priceMax: number | null = isFree ? 0 : null;
-    if (!isFree && ta?.minimum_ticket_price?.currency === "ARS" && ta.minimum_ticket_price.major_value) {
+    if (
+      !isFree &&
+      ta?.minimum_ticket_price?.currency === "ARS" &&
+      ta.minimum_ticket_price.major_value
+    ) {
       const min = Math.round(Number(ta.minimum_ticket_price.major_value));
       const max = ta.maximum_ticket_price?.major_value
         ? Math.round(Number(ta.maximum_ticket_price.major_value))
