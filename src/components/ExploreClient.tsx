@@ -26,6 +26,7 @@ export function ExploreClient() {
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<string>("en vivo");
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MapEventProperties | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
@@ -71,10 +72,14 @@ export function ExploreClient() {
   useEffect(() => {
     const ctrl = new AbortController();
     fetch(`/api/events?${queryString}`, { signal: ctrl.signal, cache: "no-store" })
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`El servidor respondió ${r.status}`);
+        return r.json();
+      })
       .then((d: EventsGeoJSON) => {
         if (!ctrl.signal.aborted && d?.features) {
           setData(d);
+          setLoadError(null);
           setLoadedKey(queryString);
           const now = new Date();
           setLastUpdated(
@@ -82,8 +87,10 @@ export function ExploreClient() {
           );
         }
       })
-      .catch(() => {
-        if (!ctrl.signal.aborted) setLoadedKey(queryString);
+      .catch((err: unknown) => {
+        if (ctrl.signal.aborted) return;
+        setLoadError(err instanceof Error ? err.message : "No se pudo cargar la cartelera");
+        setLoadedKey(queryString);
       });
     return () => ctrl.abort();
   }, [queryString, refreshTick]);
@@ -176,8 +183,16 @@ export function ExploreClient() {
         ))}
       </div>
       <span className="flex items-center gap-1.5 font-mono text-[10.5px] text-muted">
-        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-        {loading ? "Sincronizando…" : `${data.total.toLocaleString("es-AR")} · ${lastUpdated}`}
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${
+            loadError ? "bg-amber-400" : "bg-emerald-400 animate-pulse"
+          }`}
+        />
+        {loading
+          ? "Sincronizando…"
+          : loadError
+            ? "Sin datos del servidor · reintentando"
+            : `${data.total.toLocaleString("es-AR")} · ${lastUpdated}`}
       </span>
     </div>
   );

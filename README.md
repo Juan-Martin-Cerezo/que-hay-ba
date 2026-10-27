@@ -81,6 +81,7 @@ En producción, `vercel.json` programa las tres fuentes a las 8:00, 8:20 y 8:40 
 | `GET /api/events` | GeoJSON de eventos. Query params: `when` (`now`, `today`, `weekend`, `YYYY-MM-DD`), `cat` (lista separada por comas), `price` (`free`, `eco`, `mod`, `premium`), `q`. |
 | `GET /api/events/:id` | Ficha completa de un evento, con próximas funciones. |
 | `GET /api/cron/:source` | Dispara la ingesta de una fuente (`gcba`, `alternativa`, `eventbrite`). Requiere `CRON_SECRET`. |
+| `GET /api/health` | Estado de la base. Devuelve 503 con el motivo si `DATABASE_URL` falta o Postgres no responde. |
 
 ## Deploy
 
