@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="docs/banner.webp" alt="Qué Hay BA: agenda cultural de Buenos Aires sobre un mapa" width="100%">
+  <img src="docs/banner.webp" alt="Qué Hay BA: cultural agenda of Buenos Aires on a map" width="100%">
 </p>
 
 <h1 align="center">Qué Hay BA</h1>
 
 <p align="center">
-  Agenda cultural de la Ciudad de Buenos Aires sobre un mapa interactivo.<br>
-  Ingesta tres fuentes públicas, normaliza precios y horarios, geocodifica cada evento<br>
-  y los publica como una API GeoJSON.
+  Cultural agenda for the City of Buenos Aires on an interactive map.<br>
+  It ingests three public sources, normalises prices and schedules, geocodes every venue<br>
+  and serves the result as a GeoJSON API.
 </p>
 
 <p align="center">
-  <a href="https://que-hay-ba.vercel.app"><b>Demo</b></a> ·
-  <a href="docs/ARCHITECTURE.md">Arquitectura</a> ·
-  <a href="docs/DATA-SOURCES.md">Fuentes de datos</a> ·
-  <a href="CONTRIBUTING.md">Contribuir</a>
+  <a href="https://que-hay-ba.vercel.app"><b>Live demo</b></a> ·
+  <a href="docs/ARCHITECTURE.md">Architecture</a> ·
+  <a href="docs/DATA-SOURCES.md">Data sources</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a>
 </p>
 
 <p align="center">
@@ -26,122 +26,157 @@
 
 <table>
   <tr>
-    <td width="72%"><img src="docs/screenshots/map-desktop.webp" alt="Mapa de eventos en escritorio"></td>
-    <td width="28%"><img src="docs/screenshots/map-mobile.webp" alt="Cartelera en móvil"></td>
+    <td width="72%"><img src="docs/screenshots/map-desktop.webp" alt="Event map on desktop"></td>
+    <td width="28%"><img src="docs/screenshots/map-mobile.webp" alt="Event list on mobile"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Escritorio: mapa, filtros y cartelera sincronizada</sub></td>
-    <td align="center"><sub>Móvil: lista y ficha de evento</sub></td>
+    <td align="center"><sub>Desktop: map, filters and synced listing</sub></td>
+    <td align="center"><sub>Mobile: list and event details</sub></td>
   </tr>
 </table>
 
-## Qué hace
+## What it does
 
-- **Tres fuentes, un formato.** Agenda oficial del GCBA (Linda), Alternativa Teatral y Eventbrite. Cada una tiene su parser en `src/ingest/sources/` y todas convergen al mismo tipo `RawEvent`.
-- **Normalización real.** Seis categorías, detección de eventos gratuitos, rangos de precio en ARS y deduplicación entre fuentes por título, sede y franja de 30 minutos.
-- **Geocodificación en cascada.** Coordenadas del origen → catálogo de sedes de CABA → caché en base → USIG (GCBA) → Nominatim acotado al polígono de la ciudad. Si nada resuelve, el evento se descarta: no se inventan coordenadas.
-- **Mapa propio.** MapLibre con tiles de OpenStreetMap y del mapa oficial del GCBA, cuatro estilos, agrupación de eventos por sede y popover con todas las actividades de un mismo lugar.
-- **Filtros que sirven.** Ahora, hoy, este fin de semana, fecha exacta, categoría, rango de precio, barrio y búsqueda libre.
-- **Ficha de evento.** Próxima función, precio, sede, distancia, agregar a Google Calendar, cómo llegar y favoritos en `localStorage`.
+- **Three sources, one schema.** The official GCBA agenda (Linda), Alternativa Teatral and Eventbrite. Each parser lives in `src/ingest/sources/` and returns the same `RawEvent` type.
+- **Normalisation.** Six categories, free/paid detection, ARS price ranges, and cross-source deduplication on title, venue and a 30-minute time slot.
+- **Geocoding in cascade.** Source coordinates, then a curated venue catalogue, then a Postgres cache, then USIG (GCBA), then Nominatim bounded to the city polygon. An event that resolves nowhere is dropped; coordinates are never estimated.
+- **Own map.** MapLibre with OpenStreetMap and USIG tiles, four styles, one marker per venue, and a popover listing every activity at a place.
+- **Filters that match the data.** Now, today, this weekend, a specific date, category, price bucket, and free-text search over title, venue, neighbourhood and description.
+- **Event sheet.** Next showtimes, price, venue, distance, Google Calendar link, transit directions, and favourites stored in `localStorage`.
 
 ## Stack
 
-| Capa          | Tecnología                                        |
-| ------------- | ------------------------------------------------- |
-| Frontend      | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
-| Mapa          | MapLibre GL JS                                    |
-| Base de datos | PostgreSQL 14+ (Supabase o Postgres local)        |
-| Cliente SQL   | `postgres` (postgres.js)                          |
-| Ingesta       | `tsx` + scripts en `src/ingest/`                  |
+| Layer    | Technology                                        |
+| -------- | ------------------------------------------------- |
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS 4 |
+| Map      | MapLibre GL JS                                    |
+| Database | PostgreSQL 14+ (Supabase or local Postgres)       |
+| SQL      | `postgres` (postgres.js)                          |
+| Ingest   | `tsx` scripts under `src/ingest/`                 |
 
-## Cómo correrlo
+## Quick start
 
-Requisitos: Node 20 o superior y una base PostgreSQL (local o Supabase).
+Requirements: Node 20 or newer and a PostgreSQL database, either local or on Supabase.
 
 ```bash
 git clone https://github.com/Juan-Martin-Cerezo/que-hay-ba.git
 cd que-hay-ba
 npm install
-cp .env.example .env.local   # completá DATABASE_URL
-npm run db:setup             # migraciones + sedes + primera ingesta
+cp .env.example .env.local   # set DATABASE_URL
+npm run db:setup             # migrations, venue seed and first ingest
 npm run dev                  # http://localhost:3000
 ```
 
-Con Postgres local:
+`db:setup` runs the SQL migrations, seeds the curated venue list and ingests all three sources. The first run takes a few minutes because every unknown venue goes through USIG and Nominatim.
+
+### Local Postgres
 
 ```bash
 createdb quehayba
-echo 'DATABASE_URL=postgres://localhost:5432/quehayba' >> .env.local
 ```
 
-El schema vive en `supabase/migrations/`. Las migraciones son re-ejecutables y se aplican en orden alfabético, así que `npm run db:setup` también actualiza una base existente.
-
-## Variables de entorno
-
-| Variable           | Obligatoria      | Para qué                                                                                              |
-| ------------------ | ---------------- | ----------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`     | sí               | Conexión a Postgres. Con Supabase, usá el connection string del **transaction pooler** (puerto 6543). |
-| `CRON_SECRET`      | sí en producción | Token que protege `/api/cron/:source`. Si falta, el endpoint responde 401.                            |
-| `PERPETUAL_EVENTS` | no               | `false` hace que los eventos vencidos se borren en lugar de reprogramarse (ver abajo).                |
-
-## Ingesta
+Then set the connection string in `.env.local`:
 
 ```bash
-npm run ingest                             # las tres fuentes
-npx tsx scripts/ingest.ts --source=gcba    # una sola
-npx tsx scripts/ingest.ts --migrate --seed # migraciones + sedes
+DATABASE_URL=postgres://localhost:5432/quehayba
 ```
 
-En producción, `vercel.json` programa las tres fuentes a las 8:00, 8:20 y 8:40 (hora argentina) y llama a `/api/cron/:source` con `Authorization: Bearer $CRON_SECRET`. En cualquier otro hosting, apuntá un cron al mismo endpoint.
+### Supabase
 
-**Sobre `PERPETUAL_EVENTS`:** el modo perpetuo (por defecto) mueve los eventos vencidos en saltos de 7 días para conservar día de la semana y horario. Sirve para demos y ciclos semanales, pero implica mostrar ocurrencias futuras que las fuentes no publicaron. Para una agenda estrictamente fiel, poné `PERPETUAL_EVENTS=false`: los eventos vencidos se eliminan después de 24 horas.
+Create a project, open **Database settings**, copy the connection string and use the transaction pooler on port 6543. The client runs with `prepare: false`, which that pooler requires. TLS is enabled automatically for any host that is not `localhost` or `127.0.0.1`.
+
+The schema lives in `supabase/migrations/`. Every file is written to be re-runnable and they are applied in alphabetical order, so `npm run db:setup` also updates an existing database.
+
+## Environment variables
+
+| Variable           | Required   | Purpose                                                                                                                           |
+| ------------------ | ---------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`     | Yes        | Postgres connection string. With Supabase, use the transaction pooler (port 6543).                                                |
+| `CRON_SECRET`      | Production | Bearer token expected by `/api/cron/:source`. When it is unset the endpoint returns 401 and ingest cannot be triggered over HTTP. |
+| `PERPETUAL_EVENTS` | No         | Set to `false` to delete elapsed events instead of rolling them forward. Enabled by default.                                      |
+
+## Ingest
+
+```bash
+npm run ingest                             # all three sources
+npx tsx scripts/ingest.ts --source=gcba    # one source
+npx tsx scripts/ingest.ts --migrate --seed # migrations, venue seed, then ingest
+```
+
+| Flag            | Effect                                                                      |
+| --------------- | --------------------------------------------------------------------------- |
+| `--source=<id>` | `gcba`, `eventbrite` or `alternativa`. Defaults to `all`.                   |
+| `--migrate`     | Applies every `*.sql` file in `supabase/migrations/` in alphabetical order. |
+| `--seed`        | Upserts the curated CABA venue list (`src/ingest/venues-seed.ts`).          |
+
+The CLI enriches up to 80 new Alternativa shows per run. The cron endpoint uses 25 and the on-demand refresh uses 18.
+
+In production, `vercel.json` schedules the three sources at 08:00, 08:20 and 08:40 UTC (05:00 to 05:40 in Buenos Aires) and calls `/api/cron/<source>` with `Authorization: Bearer $CRON_SECRET`. On any other host, point a cron job at the same endpoint.
+
+There is a second path. Every request to `/api/events` calls `ensureFreshEvents()`, which at most once every three minutes updates the schedule and, when the newest ingest run is more than 30 minutes old, starts one source in the background in round-robin order. It is a safety net for deploys without cron, not a replacement for it: the state lives in memory, so it does nothing on serverless platforms.
+
+### About `PERPETUAL_EVENTS`
+
+Perpetual mode is the default. Any event that started more than two hours ago is moved forward in whole 7-day steps, large enough to land in the future, which keeps weekday and time intact. This keeps the map populated between ingest runs, but it also shows future occurrences that the sources never published.
+
+Set `PERPETUAL_EVENTS=false` for an agenda that only reflects published dates: elapsed events are deleted once they finished more than 24 hours ago.
 
 ## API
 
-| Endpoint                | Descripción                                                                                                                                                     |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/events`       | GeoJSON de eventos. Query params: `when` (`now`, `today`, `weekend`, `YYYY-MM-DD`), `cat` (separada por comas), `price` (`free`, `eco`, `mod`, `premium`), `q`. |
-| `GET /api/events/:id`   | Ficha completa con las próximas funciones de la misma obra.                                                                                                     |
-| `GET /api/cron/:source` | Dispara la ingesta de una fuente. Requiere `CRON_SECRET`.                                                                                                       |
-| `GET /api/health`       | Estado de la base. 503 con el motivo si falta `DATABASE_URL` o Postgres no responde.                                                                            |
+| Endpoint                | Description                                                                                                                                                                                                |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/events`       | GeoJSON `FeatureCollection`. Query params: `when` (`now`, `today`, `weekend` or `YYYY-MM-DD`), `cat` (comma-separated category ids), `price` (`free`, `eco`, `mod`, `premium`), `q` (up to 80 characters). |
+| `GET /api/events/:id`   | Full record plus the upcoming showtimes of the same production (up to 10).                                                                                                                                 |
+| `GET /api/cron/:source` | Runs the ingest for one source. Requires `CRON_SECRET`; returns 400 for an unknown source.                                                                                                                 |
+| `GET /api/health`       | Database status. Returns 503 with the reason when `DATABASE_URL` is missing or Postgres does not answer.                                                                                                   |
+
+`/api/events` returns one feature per `group_key`, capped at 1200 features. Without `when` it covers the next 30 days. `price=eco` includes free events. Responses are cached for 180 seconds with `stale-while-revalidate=600`; the detail endpoint uses 300 and 900.
 
 ## Deploy
 
-1. Creá una base Postgres y corré `npx tsx scripts/ingest.ts --migrate --seed`.
-2. Importá el repo en Vercel (o cualquier host Node) y definí `DATABASE_URL` y `CRON_SECRET`.
-3. Programá las ingestas: `vercel.json` ya lo hace en Vercel; en otros hosts, apuntá un cron a `/api/cron/gcba` y compañía con el header de autorización.
+1. Create a Postgres database and run `npx tsx scripts/ingest.ts --migrate --seed --source=all` against it.
+2. Import the repository into Vercel or any Node host and set `DATABASE_URL` and `CRON_SECRET`.
+3. Schedule the ingest. `vercel.json` already does it on Vercel; elsewhere call `/api/cron/gcba`, `/api/cron/eventbrite` and `/api/cron/alternativa` with the authorization header.
 
-No hay servicios propietarios en el camino crítico: sin Supabase ni Vercel alcanza con un Postgres y un cron.
+Nothing in the critical path is proprietary. A Postgres instance and a cron entry are enough; Supabase and Vercel are conveniences, not requirements.
 
-## Estructura
+## Project layout
 
 ```
-src/app/            rutas, layout y endpoints (App Router)
-src/components/     mapa, filtros, cartelera y ficha de evento
-src/ingest/         fuentes, normalización, geocodificación y upsert
-src/lib/            base de datos, dominio, formato y favoritos
-scripts/ingest.ts   CLI de ingesta y migraciones
-supabase/           migraciones SQL
-docs/               arquitectura, fuentes y capturas
+src/app/              routes, layout and API endpoints (App Router)
+src/components/       map, filters, listing and event sheet
+src/ingest/           sources, normalisation, geocoding and upsert
+src/lib/              database client, domain constants, formatting and favourites
+scripts/ingest.ts     ingest and migration CLI
+supabase/migrations/  SQL schema
+docs/                 architecture, data sources and screenshots
 ```
 
-Más detalle en [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) y [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md).
+More detail in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md).
 
-## Fuentes y atribución
+## Data sources & attribution
 
-Los datos pertenecen a sus publicadores. El proyecto linkea siempre a la página original de cada evento y no redistribuye contenido completo. La cartografía es de [OpenStreetMap](https://www.openstreetmap.org/copyright) y del [mapa oficial del GCBA (USIG)](https://servicios.usig.buenosaires.gob.ar). Los términos de cada fuente y los recaudos para scrapear están en [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md).
+| Source              | Content                                                              | Access                                       |
+| ------------------- | -------------------------------------------------------------------- | -------------------------------------------- |
+| GCBA agenda (Linda) | Museums, cultural centres, parks and public spaces of the City       | Public JSON API behind the official site     |
+| Alternativa Teatral | Theatre, dance and music listings, including the independent circuit | JSONP feed that requires a session cookie    |
+| Eventbrite          | In-person events published in Buenos Aires                           | Listing HTML plus the public destination API |
 
-## Cómo contribuir
+Event data belongs to its publishers. The project always links to the original page of each event and does not redistribute full content. Cartography comes from [OpenStreetMap](https://www.openstreetmap.org/copyright) and from the [official GCBA map (USIG)](https://servicios.usig.buenosaires.gob.ar). Terms of use and scraping notes for each source are in [`docs/DATA-SOURCES.md`](docs/DATA-SOURCES.md).
 
-Issues y pull requests son bienvenidos. Antes de abrir un PR, leé [`CONTRIBUTING.md`](CONTRIBUTING.md) y corré `npm run format:check`, `npm run lint`, `npm run typecheck` y `npm test`.
+## Contributing
 
-Buenas primeras contribuciones:
+Issues and pull requests are welcome. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) first and run `npm run format:check`, `npm run lint`, `npm run typecheck` and `npm test` before opening a PR.
 
-- Tests de parser con fixtures guardados: las tres fuentes cambian su markup sin aviso.
-- Agrupar pines por zoom en lugar de recortar por cantidad.
-- Sumar fuentes nuevas (CCK, centros culturales barriales, universidades).
-- Accesibilidad de la cartelera y del popover del mapa.
+Good first issues:
 
-## Licencia
+- Parser tests with saved fixtures. All three sources change their markup without notice, and the existing tests only cover GCBA and the normaliser.
+- Real clustering by zoom level instead of the current per-zoom cutoff (120 pins at zoom 15 and above, 80 from 13.6, 48 below).
+- New sources: CCK, neighbourhood cultural centres, universities.
+- Accessibility of the listing and of the map popover: keyboard navigation, focus order, screen reader labels.
 
-MIT. Ver [`LICENSE`](LICENSE).
+Internals and known limits are described in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+## License
+
+MIT. See [`LICENSE`](LICENSE).

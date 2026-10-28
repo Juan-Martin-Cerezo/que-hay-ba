@@ -1,9 +1,9 @@
-# Código de conducta
+# Code of conduct
 
-Este proyecto adopta el [Contributor Covenant v2.1](https://www.contributor-covenant.org/es/version/2/1/code_of_conduct/).
+This project adopts the [Contributor Covenant v2.1](https://www.contributor-covenant.org/version/2/1/code_of_conduct/).
 
-En corto: trato respetuoso, sin ataques personales, sin discriminación por edad, identidad, orientación, nacionalidad, nivel de experiencia o cualquier otra condición. Crítica técnica sí, descalificación no.
+In short: treat people with respect, no personal attacks, no discrimination based on age, identity, orientation, nationality, level of experience or any other condition. Technical criticism is welcome, dismissal is not.
 
-Quien mantiene el repo puede editar o cerrar issues y PRs que no respeten estas reglas.
+The maintainer may edit or close issues and pull requests that do not follow these rules.
 
-Para reportar un problema de conducta, escribí a juanmartincerezo@gmail.com. Los reportes se tratan de forma confidencial.
+To report a conduct problem, write to juanmartincerezo@gmail.com. Reports are handled confidentially.

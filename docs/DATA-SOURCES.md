@@ -1,36 +1,37 @@
-# Fuentes de datos
+# Data sources
 
-Tres fuentes, todas públicas y sin API key. Ninguna está pensada como API de terceros: son los endpoints que usan sus propios sitios. Eso implica que pueden cambiar sin aviso y que conviene consultarlas con moderación.
+Three sources, all public and none of them requiring an API key. None of them is designed as a third-party API: these are the endpoints their own sites use. They can change without notice, and they should be queried in moderation.
 
-## GCBA — agenda oficial (Linda)
+## GCBA: official agenda (Linda)
 
 - **Endpoint**: `https://linda.buenosaires.gob.ar/api/frontend/events/filter?page=N&limit=50`
-- **Qué trae**: actividades de museos, centros culturales, parques y espacios públicos de la Ciudad, con fecha, dirección, coordenadas, precio y etiquetas.
-- **Parser**: `src/ingest/sources/gcba.ts`. Pagina hasta ocho páginas por corrida.
-- **Detalle**: la API devuelve `pathAlias` con la forma `/descubrir/<slug>`, pero esa ruta ya no existe. La página real es `/eventos/<slug>` y el parser la reescribe.
-- **Atribución**: los contenidos son del Gobierno de la Ciudad de Buenos Aires. Cada evento linkea a su página oficial.
+- **Content**: activities at museums, cultural centres, parks and public spaces of the City, with date, address, coordinates, price and tags.
+- **Parser**: `src/ingest/sources/gcba.ts`. One request per run. Linda ignores `limit` and returns the whole agenda for every page, so there is nothing to gain from paging right now; the loop stays in case that changes.
+- **Occurrences**: up to three upcoming dates per event, taken from `fechasDelEvento`, within 6 hours back and 45 days ahead.
+- **Detail**: the API returns `pathAlias` as `/descubrir/<slug>`, but that route no longer exists. The real page is `/eventos/<slug>` and the parser rewrites it.
+- **Attribution**: content belongs to the Government of the City of Buenos Aires. Every event links to its official page.
 
 ## Alternativa Teatral
 
-- **Qué trae**: cartelera de teatro, danza y música en salas de CABA, incluido el circuito independiente, con precios y sinopsis.
-- **Parser**: `src/ingest/sources/alternativa.ts`. Primero obtiene cookies de sesión de `cartelera.asp` y después consume el JSON de la cartelera; cada obra se enriquece con su ficha individual, cacheada en `detail_cache`.
-- **Por qué así**: la cartelera no expone un JSON público estable; el sitio espera una sesión. El parser hace una sola petición por obra nueva y cachea el resto.
-- **Atribución**: los datos son de Alternativa Teatral. Los links van a la ficha original.
+- **Content**: theatre, dance and music listings in CABA venues, independent circuit included, with prices and synopses.
+- **Parser**: `src/ingest/sources/alternativa.ts`. It first requests `cartelera.asp` to obtain session cookies, then reads the JSONP feed from `get-json.php`. Each production is enriched from its individual page and cached in `detail_cache`.
+- **Why it works this way**: the listing has no stable public JSON; the site expects a session. The parser fetches each new production once and reuses the cached detail afterwards, in batches of six with a per-run limit.
+- **Attribution**: data belongs to Alternativa Teatral. Links go to the original page.
 
 ## Eventbrite
 
-- **Qué trae**: eventos presenciales en CABA publicados en la plataforma, con rango de precios y disponibilidad.
-- **Parser**: `src/ingest/sources/eventbrite.ts`. Búsqueda por bounding box de la ciudad y enriquecimiento con el endpoint público de disponibilidad de tickets.
-- **Atribución**: los eventos son de sus organizadores; los links van a la página de Eventbrite.
+- **Content**: in-person events published in Buenos Aires, with price ranges and availability.
+- **Parser**: `src/ingest/sources/eventbrite.ts`. It reads ten public listing pages (general, free, music, food and drink, arts), extracts the `window.__SERVER_DATA__` payload embedded in each, and enriches the collected ids through the public destination API. Online and cancelled events are dropped.
+- **Attribution**: events belong to their organisers; links go to the Eventbrite page.
 
-## Cartografía
+## Cartography
 
-- **OpenStreetMap**: tiles de `tile.openstreetmap.org`, atribución obligatoria © OpenStreetMap contributors. La [política de uso](https://operations.osmfoundation.org/policies/tiles/) pide no abusar del servicio; para tráfico alto, usá un proveedor de tiles propio.
-- **USIG (GCBA)**: `servicios.usig.buenosaires.gob.ar` para el mapa oficial y para normalizar direcciones.
+- **OpenStreetMap**: tiles from `tile.openstreetmap.org`, attribution to © OpenStreetMap contributors is required. The [tile usage policy](https://operations.osmfoundation.org/policies/tiles/) asks for moderate use; at higher traffic, use your own tile provider.
+- **USIG (GCBA)**: `servicios.usig.buenosaires.gob.ar` for the official base map and for address normalisation.
 
-## Antes de deployar a escala
+## Before deploying at scale
 
-- Revisá los términos de cada sitio. Este repo automatiza la lectura de páginas públicas para uso personal y educativo; un servicio comercial necesita permiso o un acuerdo con cada fuente.
-- No bajes la frecuencia por debajo de lo razonable: las tres ingestas diarias alcanzan porque las agendas no cambian cada hora.
-- Guardá solo lo necesario para mostrar el evento y linkear a la fuente. No redistribuyas el contenido completo.
-- Si una fuente devuelve 403 o bloquea el user-agent, la respuesta correcta es pedir acceso, no evadir el bloqueo.
+- Read the terms of each site. This repository automates the reading of public pages for personal and educational use; a commercial service needs permission or an agreement with each source.
+- Do not increase the frequency beyond what the data justifies. Three ingests per day are enough because these agendas do not change hourly.
+- Store only what is needed to display the event and link back to the source. Do not redistribute full content.
+- If a source returns 403 or blocks the user agent, the correct response is to ask for access, not to work around the block.

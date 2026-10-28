@@ -1,14 +1,14 @@
-# Cómo contribuir
+# Contributing
 
-Gracias por tomarte el tiempo. Este proyecto es chico y se mantiene solo, así que los aportes más útiles son los que vienen con contexto: un issue que reproduce el problema o un PR acotado a un cambio.
+Thanks for taking the time. This project is small and maintained by one person, so the most useful contributions come with context: an issue that reproduces a problem, or a pull request limited to one change.
 
-## Antes de empezar
+## Before you start
 
-- Buscá en los issues abiertos si alguien ya lo reportó.
-- Para cambios grandes (una fuente nueva, un refactor de la capa de datos) abrí un issue primero y discutimos el enfoque.
-- Para typos, docs o fixes chicos, mandá el PR directo.
+- Search the open issues to see whether it has already been reported.
+- For larger changes (a new source, a refactor of the data layer) open an issue first and discuss the approach.
+- For typos, docs or small fixes, send the pull request directly.
 
-## Entorno
+## Setup
 
 ```bash
 git clone https://github.com/Juan-Martin-Cerezo/que-hay-ba.git
@@ -19,43 +19,44 @@ npm run db:setup
 npm run dev
 ```
 
-Node 20 o superior. La app necesita una base Postgres: sirve un Postgres local o un proyecto de Supabase.
+Node 20 or newer. The app needs a Postgres database; a local instance or a Supabase project both work.
 
-## Checks obligatorios
+## Required checks
 
-Los tres corren en CI. Si alguno falla, el PR no se mergea.
+All of them run in CI. A pull request with a failing check is not merged.
 
 ```bash
+npm run format:check
 npm run lint
 npm run typecheck
 npm test
 ```
 
-Para verificar el build completo: `npm run build`.
+To verify the full build: `npm run build`.
 
-## Estilo
+## Style
 
-- TypeScript estricto, sin `any` nuevos.
-- Componentes y helpers en inglés, textos de interfaz en español rioplatense.
-- Sin dependencias nuevas si el problema se resuelve con lo que ya está.
-- Comentarios solo donde explican un porqué que no se lee en el código.
+- Strict TypeScript, no new `any`.
+- Components and helpers in English, interface copy in Rioplatense Spanish.
+- No new dependencies when the problem can be solved with what is already there.
+- Comments only where they explain a reason that the code does not show.
 
 ## Pull requests
 
-- Un tema por PR. Si tocaste dos cosas, mandá dos.
-- Describí el problema antes de la solución y cómo lo probaste.
-- Si tocaste un parser, agregá o actualizá el test con un fixture del HTML real.
-- Si tocaste el schema, sumá una migración nueva en `supabase/migrations/` (no edites las existentes).
+- One topic per PR. If you touched two things, send two.
+- Describe the problem before the solution, and how you tested it.
+- If you touched a parser, add or update the test with a fixture of the real HTML.
+- If you touched the schema, add a new migration in `supabase/migrations/` instead of editing existing ones.
 
-## Reportar bugs
+## Reporting bugs
 
-Incluí:
+Include:
 
-- Qué esperabas que pasara y qué pasó.
-- Pasos para reproducirlo.
-- URL del evento o captura si es un problema de datos.
-- Logs o el output del endpoint si es de ingesta.
+- What you expected to happen and what happened.
+- Steps to reproduce it.
+- The event URL or a screenshot if it is a data issue.
+- Logs or the endpoint output if it is about ingest.
 
-## Datos y fuentes
+## Data and sources
 
-No subas scrapes completos ni contenido de terceros al repo. Para tests, guardá el fragmento mínimo de HTML necesario. Si una fuente cambia su markup, el issue es bienvenido: suelen romperse sin aviso.
+Do not commit full scrapes or third-party content to the repository. For tests, keep the smallest HTML fragment that covers the case. If a source changes its markup, an issue is welcome: they tend to break without notice.
