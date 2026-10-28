@@ -37,7 +37,7 @@
     "ingest": "tsx scripts/ingest.ts --source=all"
   },
   "dependencies": {
-    "maplibre-gl": "^6.15.0",
+    "maplibre-gl": "^6.16.0",
     "next": "16.4.2",
     "postgres": "^3.4.9",
     "react": "19.3.0",
