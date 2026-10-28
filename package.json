@@ -38,10 +38,10 @@
   },
   "dependencies": {
     "maplibre-gl": "^6.15.0",
-    "next": "16.4.2",
+    "next": "16.4.3",
     "postgres": "^3.4.9",
-    "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -50,7 +50,7 @@
     "@types/react-dom": "^19",
     "dotenv": "^18.0.8",
     "eslint": "^9",
-    "eslint-config-next": "16.4.2",
+    "eslint-config-next": "16.4.3",
     "prettier": "^3.9.10",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
