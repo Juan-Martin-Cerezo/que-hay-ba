@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { ingestSource, seedVenues } from "@/ingest/run";
 import type { SourceId } from "@/ingest/types";
@@ -6,13 +7,16 @@ export const maxDuration = 60;
 
 const VALID_SOURCES = new Set<SourceId>(["gcba", "eventbrite", "alternativa"]);
 
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ source: string }> }
-) {
+function matchesSecret(header: string | null, secret: string): boolean {
+  const digest = (value: string) => createHash("sha256").update(value).digest();
+  return header !== null && timingSafeEqual(digest(header), digest(`Bearer ${secret}`));
+}
+
+export async function GET(req: NextRequest, ctx: { params: Promise<{ source: string }> }) {
+  // Fail closed: an unset CRON_SECRET must not turn the ingest into a public endpoint.
   const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
-  if (secret && authHeader !== `Bearer ${secret}`) {
+  if (!secret || !matchesSecret(authHeader, secret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -53,15 +53,6 @@ export default function AcercaPage() {
             className="text-accent underline underline-offset-4"
           >
             OpenStreetMap
-          </a>
-          ,{" "}
-          <a
-            href="https://carto.com/attributions"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent underline underline-offset-4"
-          >
-            CARTO
           </a>{" "}
           y el servicio oficial de normalización geográfica{" "}
           <a

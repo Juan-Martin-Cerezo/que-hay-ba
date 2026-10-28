@@ -1,0 +1,45 @@
+name: Bug
+description: Algo no funciona como debería
+labels: [bug]
+body:
+  - type: textarea
+    id: expected
+    attributes:
+      label: Qué esperabas que pasara
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Qué pasó
+      description: Incluí el mensaje de error o una captura si aplica.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Abrir ...
+        2. Filtrar por ...
+        3. Ver ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - Mapa
+        - Filtros o cartelera
+        - Ingesta de datos
+        - API
+        - Deploy o configuración
+        - Otro
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: Entorno
+      placeholder: Node 22, Postgres 16, Chrome 130 / producción

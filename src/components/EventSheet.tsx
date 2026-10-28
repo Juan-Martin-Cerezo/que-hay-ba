@@ -23,7 +23,11 @@ interface EventSheetProps {
 function calendarUrl(ev: MapEventProperties): string {
   const start = new Date(ev.startsAt);
   const end = ev.endsAt ? new Date(ev.endsAt) : new Date(start.getTime() + 2 * 3600_000);
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const fmt = (d: Date) =>
+    d
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}/, "");
   return `https://calendar.google.com/calendar/render?${new URLSearchParams({
     action: "TEMPLATE",
     text: ev.title,
@@ -43,12 +47,10 @@ export function EventSheet({
   onToggleFavorite,
 }: EventSheetProps) {
   const [detail, setDetail] = useState<EventDetail | null>(null);
-  const [imgFailed, setImgFailed] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [imgFailedFor, setImgFailedFor] = useState<number | null>(null);
+  const [copiedFor, setCopiedFor] = useState<number | null>(null);
 
   useEffect(() => {
-    setImgFailed(false);
-    setCopied(false);
     if (!event) return;
     let cancelled = false;
     fetch(`/api/events/${event.id}`)
@@ -69,6 +71,8 @@ export function EventSheet({
 
   if (!event) return null;
   const ev = detail && detail.id === event.id ? detail : event;
+  const imgFailed = imgFailedFor === event.id;
+  const copied = copiedFor === event.id;
   const cat = categoryById[ev.category] ?? categoryById.arte;
   const dist = userLocation ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng) : null;
 
@@ -84,8 +88,8 @@ export function EventSheet({
     }
     try {
       await navigator.clipboard.writeText(`${text} ${ev.url}`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedFor(ev.id);
+      setTimeout(() => setCopiedFor((current) => (current === ev.id ? null : current)), 2000);
     } catch {
       /* ignore */
     }
@@ -114,11 +118,18 @@ export function EventSheet({
       <div className="relative aspect-[16/9] w-full shrink-0 overflow-hidden bg-raised">
         {ev.imageUrl && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={ev.imageUrl} alt="" onError={() => setImgFailed(true)} className="h-full w-full object-cover" />
+          <img
+            src={ev.imageUrl}
+            alt=""
+            onError={() => setImgFailedFor(ev.id)}
+            className="h-full w-full object-cover"
+          />
         ) : (
           <div
             className="flex h-full w-full items-end p-5"
-            style={{ background: `radial-gradient(120% 90% at 0% 0%, ${cat.color}55, transparent 60%), #18181b` }}
+            style={{
+              background: `radial-gradient(120% 90% at 0% 0%, ${cat.color}55, transparent 60%), #18181b`,
+            }}
           >
             <span className="font-display text-4xl italic text-white/80">{cat.label}</span>
           </div>
@@ -152,7 +163,9 @@ export function EventSheet({
           <span className={ev.isFree ? "text-emerald-400" : "text-fg"}>{ev.priceLabel}</span>
         </div>
 
-        <h2 className="mt-2 font-display text-[28px] leading-[1.08] tracking-tight text-fg">{ev.title}</h2>
+        <h2 className="mt-2 font-display text-[28px] leading-[1.08] tracking-tight text-fg">
+          {ev.title}
+        </h2>
 
         {/* Facts */}
         <dl className="mt-5 divide-y divide-line border-y border-line text-sm">
@@ -191,7 +204,9 @@ export function EventSheet({
                   type="button"
                   onClick={() => onSelectSibling(s)}
                   className={`max-w-[200px] shrink-0 truncate rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    s.id === ev.id ? "border-accent text-accent" : "border-line text-muted hover:text-fg"
+                    s.id === ev.id
+                      ? "border-accent text-accent"
+                      : "border-line text-muted hover:text-fg"
                   }`}
                 >
                   {s.title}
@@ -208,7 +223,10 @@ export function EventSheet({
             </p>
             <div className="flex flex-wrap gap-1.5">
               {detail.upcomingSchedule.slice(0, 8).map((s) => (
-                <span key={s.id} className="rounded-md bg-raised px-2 py-1 font-mono text-[11px] text-fg/80">
+                <span
+                  key={s.id}
+                  className="rounded-md bg-raised px-2 py-1 font-mono text-[11px] text-fg/80"
+                >
                   {formatEventDate(s.startsAt)}
                 </span>
               ))}
@@ -217,10 +235,14 @@ export function EventSheet({
         )}
 
         {ev.description && (
-          <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-fg/70">{ev.description}</p>
+          <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-fg/70">
+            {ev.description}
+          </p>
         )}
 
-        <p className="mt-6 font-mono text-[10px] text-muted">Fuente: {SOURCE_LABELS[ev.source] ?? ev.source}</p>
+        <p className="mt-6 font-mono text-[10px] text-muted">
+          Fuente: {SOURCE_LABELS[ev.source] ?? ev.source}
+        </p>
       </div>
 
       {/* Actions */}
@@ -231,10 +253,18 @@ export function EventSheet({
           aria-pressed={isFavorite}
           aria-label={isFavorite ? "Quitar de guardados" : "Guardar"}
           className={`flex h-11 w-11 items-center justify-center rounded-xl border transition-colors ${
-            isFavorite ? "border-accent bg-accent/15 text-accent" : "border-line text-muted hover:text-fg"
+            isFavorite
+              ? "border-accent bg-accent/15 text-accent"
+              : "border-line text-muted hover:text-fg"
           }`}
         >
-          <svg viewBox="0 0 24 24" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill={isFavorite ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+          >
             <path d="M6 3h12v18l-6-4-6 4V3Z" />
           </svg>
         </button>

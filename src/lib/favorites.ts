@@ -33,10 +33,7 @@ function readStorage(): FavoriteItem[] {
 export function useFavorites() {
   const [items, setItems] = useState<FavoriteItem[]>(() => readStorage());
 
-  const isFavorite = useCallback(
-    (id: number) => items.some((item) => item.id === id),
-    [items]
-  );
+  const isFavorite = useCallback((id: number) => items.some((item) => item.id === id), [items]);
 
   const toggleFavorite = useCallback((item: FavoriteItem) => {
     setItems((prev) => {

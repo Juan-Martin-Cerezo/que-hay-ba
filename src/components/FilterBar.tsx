@@ -43,7 +43,10 @@ export function FilterBar({
   const [more, setMore] = useState(false);
   const customDate = /^\d{4}-\d{2}-\d{2}$/.test(filters.when) ? filters.when : "";
   const activeCount =
-    (filters.q ? 1 : 0) + (filters.when ? 1 : 0) + (filters.price ? 1 : 0) + filters.categories.length;
+    (filters.q ? 1 : 0) +
+    (filters.when ? 1 : 0) +
+    (filters.price ? 1 : 0) +
+    filters.categories.length;
 
   const toggleCat = (id: CategoryId) =>
     onChange({
@@ -95,12 +98,21 @@ export function FilterBar({
           aria-expanded={more}
           onClick={() => setMore((v) => !v)}
           className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
-            more || customDate || (filters.price && filters.price !== "free") || activeZone !== "all"
+            more ||
+            customDate ||
+            (filters.price && filters.price !== "free") ||
+            activeZone !== "all"
               ? "border-accent bg-accent/15 text-accent"
               : "border-line bg-raised text-muted hover:text-fg"
           }`}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-3.5 w-3.5">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-3.5 w-3.5"
+          >
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
           <span>Filtros</span>
@@ -157,7 +169,9 @@ export function FilterBar({
                 aria-pressed={on}
                 onClick={() => toggleCat(c.id)}
                 className={`${chip} flex items-center gap-1.5 ${on ? "text-ink font-semibold" : chipIdle}`}
-                style={on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined}
+                style={
+                  on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined
+                }
               >
                 <span className="text-xs leading-none">{c.emoji}</span>
                 <span>{c.shortLabel}</span>

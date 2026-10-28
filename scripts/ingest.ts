@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "dotenv";
 
@@ -18,9 +18,15 @@ async function main() {
   const db = sql();
 
   if (migrate) {
-    const migrationSql = readFileSync(join(process.cwd(), "supabase/migrations/0001_init.sql"), "utf8");
-    await db.unsafe(migrationSql);
-    console.log("✓ Applied supabase/migrations/0001_init.sql");
+    const dir = join(process.cwd(), "supabase/migrations");
+    // Migrations are written to be re-runnable, so every deploy applies all of them in order.
+    const files = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort();
+    for (const file of files) {
+      await db.unsafe(readFileSync(join(dir, file), "utf8"));
+      console.log(`✓ Applied supabase/migrations/${file}`);
+    }
   }
 
   if (seed) {
@@ -29,9 +35,7 @@ async function main() {
   }
 
   const sources: SourceId[] =
-    sourceArg === "all"
-      ? ["gcba", "eventbrite", "alternativa"]
-      : ([sourceArg] as SourceId[]);
+    sourceArg === "all" ? ["gcba", "eventbrite", "alternativa"] : ([sourceArg] as SourceId[]);
 
   for (const s of sources) {
     console.log(`→ Ingesting ${s}...`);

@@ -1,14 +1,38 @@
 {
   "name": "que-hay-ba",
   "version": "0.1.0",
-  "private": true,
+  "description": "Agenda cultural de la Ciudad de Buenos Aires sobre un mapa interactivo: ingesta, normaliza y geolocaliza eventos de tres fuentes públicas.",
+  "license": "MIT",
+  "homepage": "https://que-hay-ba.vercel.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Juan-Martin-Cerezo/que-hay-ba.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Juan-Martin-Cerezo/que-hay-ba/issues"
+  },
+  "keywords": [
+    "buenos-aires",
+    "caba",
+    "eventos",
+    "agenda-cultural",
+    "nextjs",
+    "maplibre",
+    "postgres",
+    "open-data"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/ingest/normalise.test.ts",
+    "test": "tsx --test \"src/**/*.test.ts\"",
     "db:setup": "tsx scripts/ingest.ts --migrate --seed --source=all",
     "ingest": "tsx scripts/ingest.ts --source=all"
   },
@@ -27,6 +51,7 @@
     "dotenv": "^18.0.8",
     "eslint": "^9",
     "eslint-config-next": "16.4.2",
+    "prettier": "^3.9.10",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5"

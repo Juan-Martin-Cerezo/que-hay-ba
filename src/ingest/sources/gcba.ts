@@ -39,26 +39,55 @@ interface GcbaResponse {
 
 const BASE = "https://linda.buenosaires.gob.ar";
 
-export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
+/**
+ * Linda's API advertises /descubrir/<slug> for events, but that route is gone:
+ * the public page lives at /eventos/<slug>.
+ */
+export function gcbaEventUrl(pathAlias?: string | null, slug?: string | null): string {
+  const raw = pathAlias || (slug ? `/descubrir/${slug}` : "/agenda");
+  const path = raw.replace("/descubrir/", "/eventos/");
+  return path.startsWith("http") ? path : `${BASE}${path}`;
+}
+
+async function fetchPage(page: number): Promise<GcbaResponse | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const res = await fetch(`${BASE}/api/frontend/events/filter?page=${page}&limit=50`, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) QueHayBA/1.0",
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (res.ok) return (await res.json()) as GcbaResponse;
+    } catch {
+      // Retry below; a timeout here should not abort the whole run.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
+  }
+  return null;
+}
+
+export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
   const results: RawEvent[] = [];
   const now = Date.now();
   const minTime = now - 6 * 3600_000;
   const maxTime = now + 45 * 86_400_000;
 
+  // Linda ignores `limit` and serves the same payload on every page, so a single
+  // request holds the whole agenda. Keep the loop for the day it starts paging.
+  const seenIds = new Set<string>();
+
   let totalPages = 1;
   for (let page = 1; page <= Math.min(totalPages, maxPages); page++) {
-    const res = await fetch(`${BASE}/api/frontend/events/filter?page=${page}&limit=50`, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) QueHayBA/1.0",
-      },
-      signal: AbortSignal.timeout(15000),
-    });
-    if (!res.ok) break;
-    const data = (await res.json()) as GcbaResponse;
+    const data = await fetchPage(page);
+    if (!data) break;
     totalPages = data.pagination?.totalPages ?? 1;
 
     for (const ev of data.events ?? []) {
+      if (seenIds.has(ev.id)) continue;
+      seenIds.add(ev.id);
+
       const title = (ev.title ?? "").trim();
       if (!title) continue;
 
@@ -90,7 +119,9 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
       const candidateDates = (ev.fechasDelEvento?.length ? ev.fechasDelEvento : [ev.fechaInicio])
         .filter((d): d is string => Boolean(d))
         .map((d) => new Date(d))
-        .filter((d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime)
+        .filter(
+          (d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime
+        )
         .sort((a, b) => a.getTime() - b.getTime());
 
       // If fechaInicio is in the past (long-running exhibition) but fechaFin is in the future, anchor to today 14:00 ART.
@@ -102,10 +133,14 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
         }
       }
 
-      const urlPath = ev.pathAlias || (ev.slug ? `/descubrir/${ev.slug}` : "/agenda");
-      const officialUrl = urlPath.startsWith("http") ? urlPath : `${BASE}${urlPath}`;
-      const barrio = ev.barrio ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : null;
-      const cats = [...(ev.etiquetas ?? []), ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : [])];
+      const officialUrl = gcbaEventUrl(ev.pathAlias, ev.slug);
+      const barrio = ev.barrio
+        ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : null;
+      const cats = [
+        ...(ev.etiquetas ?? []),
+        ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : []),
+      ];
 
       for (const startsAt of candidateDates.slice(0, 3)) {
         results.push({
@@ -130,6 +165,10 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
         });
       }
     }
+  }
+
+  if (results.length === 0) {
+    throw new Error("GCBA returned no usable events");
   }
 
   return results;

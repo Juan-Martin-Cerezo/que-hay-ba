@@ -34,6 +34,43 @@ const DEFAULT_CATEGORY_BY_SOURCE: Record<SourceId, CategoryId> = {
   gcba: "arte",
 };
 
+const PERPETUAL_EVENTS = process.env.PERPETUAL_EVENTS !== "false";
+
+/**
+ * Keeps the calendar populated between ingest runs.
+ *
+ * Perpetual mode (default) rolls elapsed events forward in 7-day steps, which is
+ * useful for demos and for schedules such as weekly milongas. Set
+ * PERPETUAL_EVENTS=false to drop elapsed events instead, so the map only shows
+ * dates that were actually published by the sources.
+ */
+async function refreshSchedule(): Promise<number> {
+  const db = sql();
+
+  if (!PERPETUAL_EVENTS) {
+    const removed = await db<{ id: number }[]>`
+      delete from events
+      where coalesce(ends_at, starts_at) < now() - interval '1 day'
+      returning id
+    `;
+    return removed.length;
+  }
+
+  const rolled = await db<{ id: number }[]>`
+    update events
+    set
+      starts_at = starts_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0))),
+      ends_at = case
+        when ends_at is not null then ends_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0)))
+        else null
+      end,
+      last_seen_at = now()
+    where starts_at < now() - interval '2 hours'
+    returning id
+  `;
+  return rolled.length;
+}
+
 export interface IngestSummary {
   source: SourceId;
   fetched: number;
@@ -42,7 +79,10 @@ export interface IngestSummary {
   durationMs: number;
 }
 
-export async function ingestSource(source: SourceId, opts?: { enrichLimit?: number }): Promise<IngestSummary> {
+export async function ingestSource(
+  source: SourceId,
+  opts?: { enrichLimit?: number }
+): Promise<IngestSummary> {
   const db = sql();
   const started = Date.now();
 
@@ -86,7 +126,12 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
         venueMap.set(venueKey, venue);
       }
 
-      const price = parsePrice(raw.priceText ?? raw.description, raw.isFree, raw.priceMin, raw.priceMax);
+      const price = parsePrice(
+        raw.priceText ?? raw.description,
+        raw.isFree,
+        raw.priceMin,
+        raw.priceMax
+      );
       const category = classifyEvent(
         raw.title,
         raw.description,
@@ -110,6 +155,7 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
           ${venue.id}, now()
         )
         on conflict (dedup_key) do update set
+          url         = excluded.url,
           description = coalesce(excluded.description, events.description),
           image_url   = coalesce(excluded.image_url, events.image_url),
           tickets_url = coalesce(excluded.tickets_url, events.tickets_url),
@@ -125,24 +171,11 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
       upserted++;
     }
 
-    // Perpetual rolling schedule: instead of deleting past events, roll any elapsed
-    // event forward in 7-day increments so day-of-week and hour stay accurate forever.
-    const rolledRows = await db<{ id: number }[]>`
-      update events
-      set
-        starts_at = starts_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0))),
-        ends_at = case
-          when ends_at is not null then ends_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0)))
-          else null
-        end,
-        last_seen_at = now()
-      where starts_at < now() - interval '2 hours'
-      returning id
-    `;
+    const prunedCount = await refreshSchedule();
 
     await db`
       update ingest_runs
-      set finished_at = now(), ok = true, fetched = ${rawEvents.length}, upserted = ${upserted}, pruned = ${rolledRows.length}
+      set finished_at = now(), ok = true, fetched = ${rawEvents.length}, upserted = ${upserted}, pruned = ${prunedCount}
       where id = ${runId}
     `;
 
@@ -150,7 +183,7 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
       source,
       fetched: rawEvents.length,
       upserted,
-      pruned: rolledRows.length,
+      pruned: prunedCount,
       durationMs: Date.now() - started,
     };
   } catch (err) {
@@ -170,9 +203,8 @@ const SOURCES_CYCLE: SourceId[] = ["gcba", "alternativa", "eventbrite"];
 let sourceCursor = 0;
 
 /**
- * Self-healing perpetual event engine:
- * 1. Rolls any past events forward by 7-day multiples so the schedule never empties ("por toda la eternidad").
- * 2. Triggers non-blocking background scraping whenever the last ingest run is > 30 minutes old.
+ * Runs on read requests: keeps the schedule fresh and, when the last ingest is
+ * older than 30 minutes, kicks off one source in the background (round-robin).
  */
 export async function ensureFreshEvents(): Promise<void> {
   const now = Date.now();
@@ -181,17 +213,7 @@ export async function ensureFreshEvents(): Promise<void> {
 
   const db = sql();
   try {
-    await db`
-      update events
-      set
-        starts_at = starts_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0))),
-        ends_at = case
-          when ends_at is not null then ends_at + (interval '7 days' * greatest(1, ceil(extract(epoch from (now() - starts_at)) / 604800.0)))
-          else null
-        end,
-        last_seen_at = now()
-      where starts_at < now() - interval '2 hours'
-    `;
+    await refreshSchedule();
 
     if (!isRefreshingBg) {
       const [latest] = await db<{ started_at: string }[]>`

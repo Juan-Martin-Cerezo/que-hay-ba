@@ -37,8 +37,12 @@ export async function resolveCoords(
   const db = sql();
 
   // 3. Check geocode_cache in Postgres.
+  // Misses expire: an address that USIG did not resolve last month gets retried.
   const cached = await db<{ lat: number | null; lng: number | null }[]>`
-    select lat, lng from geocode_cache where query = ${query} limit 1
+    select lat, lng from geocode_cache
+    where query = ${query}
+      and (lat is not null or checked_at > now() - interval '30 days')
+    limit 1
   `;
   if (cached.length > 0) {
     const c = cached[0];
@@ -47,7 +51,9 @@ export async function resolveCoords(
   }
 
   // 4. USIG (GCBA official address normaliser + geocoder, WGS84).
-  const rawAddress = (address || venueName).replace(/,?\s*(caba|capital federal|buenos aires).*$/i, "").trim();
+  const rawAddress = (address || venueName)
+    .replace(/,?\s*(caba|capital federal|buenos aires).*$/i, "")
+    .trim();
   const coords = (await geocodeUsig(rawAddress)) ?? (await geocodeNominatim(rawAddress));
 
   await db`
@@ -87,14 +93,24 @@ async function geocodeUsig(address: string): Promise<{ lat: number; lng: number 
   }
 }
 
+let lastNominatimAt = 0;
+
 async function geocodeNominatim(address: string): Promise<{ lat: number; lng: number } | null> {
+  // Nominatim's usage policy allows one request per second.
+  const wait = 1100 - (Date.now() - lastNominatimAt);
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  lastNominatimAt = Date.now();
+
   try {
     const q = `${address}, Ciudad Autónoma de Buenos Aires, Argentina`;
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&bounded=1&viewbox=-58.532,-34.526,-58.334,-34.706&q=${encodeURIComponent(
       q
     )}`;
     const res = await fetch(url, {
-      headers: { Accept: "application/json", "User-Agent": "QueHayBA/1.0 (+https://que-hay-ba.vercel.app)" },
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "QueHayBA/1.0 (+https://que-hay-ba.vercel.app)",
+      },
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return null;
