@@ -84,11 +84,17 @@ export async function fetchRecoletaEvents(): Promise<RawEvent[]> {
     const title = stripHtml(titleRaw).trim();
     if (!title || /\bconvocatoria\b/i.test(title)) continue;
 
-    const href = block.match(/<a[^>]+class="[^"]*see-more-button[^"]*"[^>]+href="([^"]+)"/i)?.[1]?.trim();
+    const href = block
+      .match(/<a[^>]+class="[^"]*see-more-button[^"]*"[^>]+href="([^"]+)"/i)?.[1]
+      ?.trim();
     if (!href) continue;
 
-    const tag = stripHtml(block.match(/<a[^>]+class="link1"[^>]*>([\s\S]*?)<\/a>/i)?.[1] ?? "").replace(/^#/, "").trim();
-    const dateText = stripHtml(block.match(/<div class=['"]date['"][^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "").trim();
+    const tag = stripHtml(block.match(/<a[^>]+class="link1"[^>]*>([\s\S]*?)<\/a>/i)?.[1] ?? "")
+      .replace(/^#/, "")
+      .trim();
+    const dateText = stripHtml(
+      block.match(/<div class=['"]date['"][^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? ""
+    ).trim();
     const imgSrc = block.match(/<img[^>]+src="([^"]+)"/i)?.[1]?.trim() ?? null;
     const imageUrl = imgSrc ? (imgSrc.startsWith("http") ? imgSrc : `${BASE}${imgSrc}`) : null;
     const fullUrl = href.startsWith("http") ? href : `${BASE}${href}`;

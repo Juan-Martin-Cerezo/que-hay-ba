@@ -13,7 +13,13 @@ interface FavoritesDrawerProps {
   onRemove: (item: FavoriteItem) => void;
 }
 
-export function FavoritesDrawer({ open, items, onClose, onSelect, onRemove }: FavoritesDrawerProps) {
+export function FavoritesDrawer({
+  open,
+  items,
+  onClose,
+  onSelect,
+  onRemove,
+}: FavoritesDrawerProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -24,7 +30,10 @@ export function FavoritesDrawer({ open, items, onClose, onSelect, onRemove }: Fa
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
         role="dialog"
         aria-label="Guardados"
@@ -34,7 +43,9 @@ export function FavoritesDrawer({ open, items, onClose, onSelect, onRemove }: Fa
         <header className="flex items-end justify-between px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
           <div>
             <h2 className="font-display text-3xl leading-none">Guardados</h2>
-            <p className="mt-1.5 font-mono text-[11px] text-muted">{items.length} en este dispositivo</p>
+            <p className="mt-1.5 font-mono text-[11px] text-muted">
+              {items.length} en este dispositivo
+            </p>
           </div>
           <button
             type="button"
@@ -56,8 +67,15 @@ export function FavoritesDrawer({ open, items, onClose, onSelect, onRemove }: Fa
               const cat = categoryById[item.category] ?? categoryById.arte;
               return (
                 <li key={item.id} className="flex items-start gap-3 px-5 py-4">
-                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cat.color }} />
-                  <button type="button" onClick={() => onSelect(item)} className="min-w-0 flex-1 cursor-pointer text-left">
+                  <span
+                    className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: cat.color }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onSelect(item)}
+                    className="min-w-0 flex-1 cursor-pointer text-left"
+                  >
                     <span className="line-clamp-2 text-sm font-medium text-fg">{item.title}</span>
                     <span className="mt-1 block truncate font-mono text-[11px] text-muted">
                       {formatEventDate(item.startsAt)} · {item.venueName}

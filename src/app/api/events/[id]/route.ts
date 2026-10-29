@@ -2,10 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { sql } from "@/lib/db";
 import { formatPriceLabel } from "@/ingest/normalise";
 
-export async function GET(
-  _req: NextRequest,
-  ctx: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const eventId = Number.parseInt(id, 10);
   if (!Number.isFinite(eventId)) {
@@ -13,28 +10,30 @@ export async function GET(
   }
 
   const db = sql();
-  const rows = await db<{
-    id: number;
-    group_key: string;
-    title: string;
-    description: string | null;
-    image_url: string | null;
-    url: string;
-    tickets_url: string | null;
-    source: string;
-    sources: Array<{ source: string; url: string }>;
-    category: string;
-    is_free: boolean;
-    price_min: number | null;
-    price_max: number | null;
-    starts_at: string;
-    ends_at: string | null;
-    venue_name: string;
-    address: string | null;
-    barrio: string | null;
-    lat: number;
-    lng: number;
-  }[]>`
+  const rows = await db<
+    {
+      id: number;
+      group_key: string;
+      title: string;
+      description: string | null;
+      image_url: string | null;
+      url: string;
+      tickets_url: string | null;
+      source: string;
+      sources: Array<{ source: string; url: string }>;
+      category: string;
+      is_free: boolean;
+      price_min: number | null;
+      price_max: number | null;
+      starts_at: string;
+      ends_at: string | null;
+      venue_name: string;
+      address: string | null;
+      barrio: string | null;
+      lat: number;
+      lng: number;
+    }[]
+  >`
     select
       e.id, e.group_key, e.title, e.description, e.image_url, e.url, e.tickets_url,
       e.source, e.sources, e.category, e.is_free, e.price_min, e.price_max,

@@ -48,7 +48,10 @@ export interface IngestSummary {
   durationMs: number;
 }
 
-export async function ingestSource(source: SourceId, opts?: { enrichLimit?: number }): Promise<IngestSummary> {
+export async function ingestSource(
+  source: SourceId,
+  opts?: { enrichLimit?: number }
+): Promise<IngestSummary> {
   const db = sql();
   const started = Date.now();
 
@@ -99,12 +102,7 @@ export async function ingestSource(source: SourceId, opts?: { enrichLimit?: numb
             venueMap.set(venueKey, venue);
           }
 
-          const price = parsePrice(
-            raw.priceText,
-            raw.isFree,
-            raw.priceMin,
-            raw.priceMax
-          );
+          const price = parsePrice(raw.priceText, raw.isFree, raw.priceMin, raw.priceMax);
           const category = classifyEvent(
             raw.title,
             raw.description,

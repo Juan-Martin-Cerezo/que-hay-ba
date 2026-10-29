@@ -31,14 +31,11 @@ describe("parsePrice", () => {
       priceMin: null,
       priceMax: null,
     });
-    assert.deepEqual(
-      parsePrice("Actividad arancelada. Los miércoles la entrada es sin costo."),
-      {
-        isFree: false,
-        priceMin: null,
-        priceMax: null,
-      }
-    );
+    assert.deepEqual(parsePrice("Actividad arancelada. Los miércoles la entrada es sin costo."), {
+      isFree: false,
+      priceMin: null,
+      priceMax: null,
+    });
     assert.deepEqual(
       parsePrice(
         "Encuentro anual. Este es un espacio de difusión abierto y gratuito. El contenido de eventos de privados..."

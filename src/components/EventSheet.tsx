@@ -23,7 +23,11 @@ interface EventSheetProps {
 function calendarUrl(ev: MapEventProperties): string {
   const start = new Date(ev.startsAt);
   const end = ev.endsAt ? new Date(ev.endsAt) : new Date(start.getTime() + 2 * 3600_000);
-  const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const fmt = (d: Date) =>
+    d
+      .toISOString()
+      .replace(/[-:]/g, "")
+      .replace(/\.\d{3}/, "");
   return `https://calendar.google.com/calendar/render?${new URLSearchParams({
     action: "TEMPLATE",
     text: ev.title,
@@ -124,9 +128,13 @@ export function EventSheet({
         ) : (
           <div
             className="flex h-full w-full items-end p-5"
-            style={{ background: `radial-gradient(120% 90% at 0% 0%, ${cat.color}55, transparent 60%), #18181b` }}
+            style={{
+              background: `radial-gradient(120% 90% at 0% 0%, ${cat.color}55, transparent 60%), #18181b`,
+            }}
           >
-            <span className="font-display text-3xl sm:text-4xl italic text-white/80">{cat.label}</span>
+            <span className="font-display text-3xl sm:text-4xl italic text-white/80">
+              {cat.label}
+            </span>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-panel via-transparent to-black/35" />
@@ -209,7 +217,9 @@ export function EventSheet({
                   type="button"
                   onClick={() => onSelectSibling(s)}
                   className={`min-h-9 max-w-[220px] shrink-0 cursor-pointer truncate rounded-full border px-3.5 py-1.5 text-xs transition-colors ${
-                    s.id === ev.id ? "border-accent bg-accent/15 text-accent font-medium" : "border-line text-muted hover:text-fg"
+                    s.id === ev.id
+                      ? "border-accent bg-accent/15 text-accent font-medium"
+                      : "border-line text-muted hover:text-fg"
                   }`}
                 >
                   {s.title}
@@ -226,7 +236,10 @@ export function EventSheet({
             </p>
             <div className="flex flex-wrap gap-1.5">
               {detail.upcomingSchedule.slice(0, 8).map((s) => (
-                <span key={s.id} className="rounded-lg border border-line bg-raised px-2.5 py-1 font-mono text-[11px] text-fg/85">
+                <span
+                  key={s.id}
+                  className="rounded-lg border border-line bg-raised px-2.5 py-1 font-mono text-[11px] text-fg/85"
+                >
                   {formatEventDate(s.startsAt)}
                 </span>
               ))}
@@ -235,7 +248,9 @@ export function EventSheet({
         )}
 
         {ev.description && (
-          <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-fg/80">{ev.description}</p>
+          <p className="mt-5 whitespace-pre-line text-sm leading-relaxed text-fg/80">
+            {ev.description}
+          </p>
         )}
 
         <p className="mt-6 font-mono text-[11px] text-muted">
@@ -251,10 +266,18 @@ export function EventSheet({
           aria-pressed={isFavorite}
           aria-label={isFavorite ? "Quitar de guardados" : "Guardar"}
           className={`flex h-12 w-12 cursor-pointer items-center justify-center rounded-xl border transition-colors active:scale-95 ${
-            isFavorite ? "border-accent bg-accent/15 text-accent" : "border-line text-muted hover:text-fg"
+            isFavorite
+              ? "border-accent bg-accent/15 text-accent"
+              : "border-line text-muted hover:text-fg"
           }`}
         >
-          <svg viewBox="0 0 24 24" fill={isFavorite ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill={isFavorite ? "currentColor" : "none"}
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+          >
             <path d="M6 3h12v18l-6-4-6 4V3Z" />
           </svg>
         </button>

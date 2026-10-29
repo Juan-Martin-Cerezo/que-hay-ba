@@ -15,7 +15,9 @@ export default function AcercaPage() {
           ← Volver al mapa
         </Link>
 
-        <h1 className="mt-8 font-display text-3xl sm:text-4xl tracking-tight text-fg">Acerca de Qué Hay BA</h1>
+        <h1 className="mt-8 font-display text-3xl sm:text-4xl tracking-tight text-fg">
+          Acerca de Qué Hay BA
+        </h1>
         <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted">
           <strong className="text-fg">Qué Hay BA</strong> reúne en un único atlas cartográfico la
           cartelera cultural, gastronómica, teatral y recreativa de la Ciudad Autónoma de Buenos
@@ -63,7 +65,8 @@ export default function AcercaPage() {
           como <strong className="text-emerald-400">Gratis</strong> una actividad cuando la fuente
           oficial confirma acceso libre y sin costo, sin contradicciones ni boleterías aranceladas.
           Cuando el organizador no publica el importe exacto o la modalidad es a la gorra / en
-          puerta, se informa explícitamente <strong className="text-fg">Precio no informado</strong>.
+          puerta, se informa explícitamente <strong className="text-fg">Precio no informado</strong>
+          .
         </p>
 
         <h2 className="mt-8 font-mono text-[11px] uppercase tracking-wider text-muted">

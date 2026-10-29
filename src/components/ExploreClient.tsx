@@ -36,7 +36,12 @@ export function ExploreClient() {
   const [mapTheme, setMapTheme] = useState<MapThemeId>("dark");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<{
+    lat: number;
+    lng: number;
+    zoom?: number;
+    ts: number;
+  } | null>(null);
 
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
@@ -119,10 +124,12 @@ export function ExploreClient() {
   const events = useMemo(() => {
     const list = data.features.map((f) => f.properties);
     if (sortMode === "nearest" && userLocation) {
-      const d = (e: MapEventProperties) => distanceKm(userLocation.lat, userLocation.lng, e.lat, e.lng);
+      const d = (e: MapEventProperties) =>
+        distanceKm(userLocation.lat, userLocation.lng, e.lat, e.lng);
       return [...list].sort((a, b) => d(a) - d(b)).slice(0, 300);
     }
-    if (sortMode === "free") return [...list].sort((a, b) => Number(b.isFree) - Number(a.isFree)).slice(0, 300);
+    if (sortMode === "free")
+      return [...list].sort((a, b) => Number(b.isFree) - Number(a.isFree)).slice(0, 300);
     return list.slice(0, 300);
   }, [data.features, sortMode, userLocation]);
 
@@ -211,7 +218,9 @@ export function ExploreClient() {
       ) : (
         events.map((ev) => {
           const cat = categoryById[ev.category] ?? categoryById.arte;
-          const dist = userLocation ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng) : null;
+          const dist = userLocation
+            ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng)
+            : null;
           const on = selected?.id === ev.id;
           const hasNumericPrice = ev.priceMin != null && ev.priceMin > 0;
           return (
@@ -235,7 +244,9 @@ export function ExploreClient() {
                   {cat.emoji}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className={`line-clamp-1 text-[14.5px] font-medium leading-snug ${on ? "text-accent" : "text-fg"}`}>
+                  <span
+                    className={`line-clamp-1 text-[14.5px] font-medium leading-snug ${on ? "text-accent" : "text-fg"}`}
+                  >
                     {ev.title}
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-muted">
@@ -266,7 +277,10 @@ export function ExploreClient() {
         })
       )}
       <li className="px-4 py-4 text-center">
-        <Link href="/acerca" className="inline-flex min-h-10 items-center px-3 font-mono text-xs text-muted hover:text-fg">
+        <Link
+          href="/acerca"
+          className="inline-flex min-h-10 items-center px-3 font-mono text-xs text-muted hover:text-fg"
+        >
           Fuentes y metodología →
         </Link>
       </li>
@@ -288,14 +302,26 @@ export function ExploreClient() {
       {/* Floating map tools — top right on desktop, bottom-right above sheet on mobile */}
       <div className="pointer-events-none absolute right-3 top-3 z-10 hidden gap-2 md:flex">
         <ToolButton onClick={cycleTheme} label={`Mapa: ${themeLabel}`}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className="h-4 w-4"
+          >
             <path d="m12 3 9 5-9 5-9-5 9-5Z" />
             <path d="m3 13 9 5 9-5" />
           </svg>
           <span>{themeLabel}</span>
         </ToolButton>
         <ToolButton onClick={locate} label="Mi ubicación" active={Boolean(userLocation)}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}>
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}
+          >
             <circle cx="12" cy="12" r="3" />
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
           </svg>
@@ -328,10 +354,18 @@ export function ExploreClient() {
               onClick={locate}
               aria-label="Mi ubicación"
               className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border active:scale-95 ${
-                userLocation ? "border-sky-400/60 bg-sky-400/15 text-sky-300" : "border-line bg-raised text-muted"
+                userLocation
+                  ? "border-sky-400/60 bg-sky-400/15 text-sky-300"
+                  : "border-line bg-raised text-muted"
               }`}
             >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}>
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}
+              >
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
               </svg>
@@ -402,7 +436,13 @@ export function ExploreClient() {
                 aria-label="Actualizar cartelera ahora"
                 className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-white/20 hover:text-fg"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${loading ? "animate-spin text-accent" : ""}`}>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  className={`h-4 w-4 ${loading ? "animate-spin text-accent" : ""}`}
+                >
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                   <path d="M21 3v6h-6" />
                 </svg>
@@ -412,7 +452,13 @@ export function ExploreClient() {
                 onClick={() => setFavoritesOpen(true)}
                 className="flex h-10 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3.5 text-xs font-medium text-muted transition-colors hover:border-white/20 hover:text-fg"
               >
-                <svg viewBox="0 0 24 24" fill={favorites.length ? "#f5b84a" : "none"} stroke={favorites.length ? "#f5b84a" : "currentColor"} strokeWidth="1.8" className="h-4 w-4">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill={favorites.length ? "#f5b84a" : "none"}
+                  stroke={favorites.length ? "#f5b84a" : "currentColor"}
+                  strokeWidth="1.8"
+                  className="h-4 w-4"
+                >
                   <path d="M6 3h12v18l-6-4-6 4V3Z" />
                 </svg>
                 <span className="font-mono">{favorites.length}</span>
@@ -471,7 +517,9 @@ function ToolButton({
       aria-label={label}
       title={label}
       className={`pointer-events-auto flex h-10 min-w-10 items-center justify-center gap-2 rounded-full border px-3.5 text-xs font-medium shadow-[0_8px_24px_-8px_rgba(0,0,0,0.85)] backdrop-blur-xl transition-colors ${
-        active ? "border-sky-400/60 bg-sky-400/15 text-sky-300" : "border-line bg-panel/95 text-fg hover:bg-raised"
+        active
+          ? "border-sky-400/60 bg-sky-400/15 text-sky-300"
+          : "border-line bg-panel/95 text-fg hover:bg-raised"
       }`}
     >
       {children}

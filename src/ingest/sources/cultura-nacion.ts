@@ -44,7 +44,10 @@ function parseSpanishDate(text: string, now = new Date()): Date | null {
   const m = /(\d{1,2})\s+de\s+([a-záéíóú]+)(?:\s+de\s+(\d{4}))?/i.exec(text);
   if (!m) return null;
   const day = m[1].padStart(2, "0");
-  const monthKey = m[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const monthKey = m[2]
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
   const month = MONTHS_ES[monthKey];
   if (!month) return null;
   const year = m[3] ? Number(m[3]) : now.getUTCFullYear();
@@ -75,12 +78,17 @@ export async function fetchCulturaNacionEvents(): Promise<RawEvent[]> {
           if (!path || !title) continue;
 
           const dateHint = stripHtml(b.match(/<small[^>]*>([\s\S]*?)<\/small>/i)?.[1] ?? "");
-          const summary = stripHtml(b.match(/<div class="bajada">([\s\S]*?)<\/div>/i)?.[1] ?? "") || null;
+          const summary =
+            stripHtml(b.match(/<div class="bajada">([\s\S]*?)<\/div>/i)?.[1] ?? "") || null;
           const imgRaw = b.match(/data-original="([^"]+)"/i)?.[1] ?? null;
-          const imageUrl = imgRaw ? (imgRaw.startsWith("http") ? imgRaw : `${BASE}${imgRaw}`) : null;
-          const tags = [...b.matchAll(/<div class="tag sector[^"]*"><span>([\s\S]*?)<\/span><\/div>/gi)].map((m) =>
-            stripHtml(m[1]).trim()
-          );
+          const imageUrl = imgRaw
+            ? imgRaw.startsWith("http")
+              ? imgRaw
+              : `${BASE}${imgRaw}`
+            : null;
+          const tags = [
+            ...b.matchAll(/<div class="tag sector[^"]*"><span>([\s\S]*?)<\/span><\/div>/gi),
+          ].map((m) => stripHtml(m[1]).trim());
 
           if (!byPath.has(path)) {
             byPath.set(path, { path, title, summary, imageUrl, dateHint, tags });
@@ -112,9 +120,15 @@ export async function fetchCulturaNacionEvents(): Promise<RawEvent[]> {
 
           // Extract ¿Dónde? paragraph (HTML uses entities like &iquest;D&oacute;nde?)
           const dondeBlock =
-            html.match(/<h3>[^<]*D(?:&oacute;|ó|o)nde\??[^<]*<\/h3>\s*<p>([\s\S]*?)<\/p>/i)?.[1] ?? "";
-          const dondeText = stripHtml(dondeBlock).replace(/\.\s*$/, "").trim();
-          const parts = dondeText.split(",").map((s) => s.trim()).filter(Boolean);
+            html.match(/<h3>[^<]*D(?:&oacute;|ó|o)nde\??[^<]*<\/h3>\s*<p>([\s\S]*?)<\/p>/i)?.[1] ??
+            "";
+          const dondeText = stripHtml(dondeBlock)
+            .replace(/\.\s*$/, "")
+            .trim();
+          const parts = dondeText
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
           const venueName = parts[0] || "Casa Nacional del Bicentenario";
           const address =
             parts
@@ -123,15 +137,21 @@ export async function fetchCulturaNacionEvents(): Promise<RawEvent[]> {
               .join(", ") || "Riobamba 985";
 
           // Extract full description
-          const contentWrap = html.match(/<div class="content-wrap">([\s\S]*?)<footer>/i)?.[1] ?? "";
+          const contentWrap =
+            html.match(/<div class="content-wrap">([\s\S]*?)<footer>/i)?.[1] ?? "";
           const description = stripHtml(contentWrap).slice(0, 1000) || c.summary;
 
           // Extract sidebar schedule + free confirmation
-          const panelBlock = html.match(/<article class="panel panel-neutro">([\s\S]*?)<\/article>/i)?.[1] ?? "";
+          const panelBlock =
+            html.match(/<article class="panel panel-neutro">([\s\S]*?)<\/article>/i)?.[1] ?? "";
           const panelText = stripHtml(panelBlock);
           const price = parsePrice(
             `${panelText}\n${description ?? ""}`,
-            /\b(actividad gratuita|entrada libre y gratuita|acceso gratuito|sin costo)\b/i.test(panelText) ? true : null
+            /\b(actividad gratuita|entrada libre y gratuita|acceso gratuito|sin costo)\b/i.test(
+              panelText
+            )
+              ? true
+              : null
           );
 
           // Determine upcoming date: if ongoing ("Hasta el..."), anchor to today 15:00 ART if end date is >= today.

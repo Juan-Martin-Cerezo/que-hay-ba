@@ -44,7 +44,9 @@ const BASE = "https://linda.buenosaires.gob.ar";
 export function buildGcbaUrl(ev: Pick<GcbaEvent, "pathAlias" | "slug">): string {
   const path = ev.pathAlias || (ev.slug ? `/eventos/${ev.slug}` : "/agenda");
   if (path.startsWith("http")) return path;
-  const fixed = path.replace(/^\/descubrir\/?(.*)$/, (_m, rest: string) => (rest ? `/eventos/${rest}` : "/agenda"));
+  const fixed = path.replace(/^\/descubrir\/?(.*)$/, (_m, rest: string) =>
+    rest ? `/eventos/${rest}` : "/agenda"
+  );
   return `${BASE}${fixed}`;
 }
 
@@ -91,14 +93,15 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
       if (!lat && !address) continue;
 
       const bodyHtml = [ev.description ?? "", ...(ev.componentes ?? [])].join("\n");
-      const cleanBody = stripHtml(bodyHtml).replace(
-        /Este es un espacio de difusi[oó]n abierto y gratuito[\s\S]*$/i,
-        ""
-      ).trim();
+      const cleanBody = stripHtml(bodyHtml)
+        .replace(/Este es un espacio de difusi[oó]n abierto y gratuito[\s\S]*$/i, "")
+        .trim();
       const description = cleanBody.slice(0, 1200) || null;
 
       // ponytail: strict GCBA price verification — never trust sin_costo if it links to a paid ticketing portal without explicit free confirmation in the body
-      const sidebarUris = (ev.botonesSidebar ?? []).map((b) => `${b.title ?? ""} ${b.uri ?? ""}`).join(" ");
+      const sidebarUris = (ev.botonesSidebar ?? [])
+        .map((b) => `${b.title ?? ""} ${b.uri ?? ""}`)
+        .join(" ");
       const hasPaidTicketingLink =
         /ticketek|allaccess|plateanet|tuentrada|passline|entradauno|movistararena|alternativateatral|complejoteatral|entradasba\.buenosaires\.gob\.ar/i.test(
           `${ev.link ?? ""} ${sidebarUris}`
@@ -107,11 +110,13 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
         /\b(entrada libre y gratuita|libre y gratuit[oa]|entrada gratuita|actividad gratuita|sin costo|sin cargo|acceso libre y gratuito|acceso gratuito)\b/i.test(
           cleanBody
         );
-      const isPaidAccess = ev.acceso === "con_entrada_paga" || /\b(arancelad[oa]|con entrada paga|con costo)\b/i.test(cleanBody);
+      const isPaidAccess =
+        ev.acceso === "con_entrada_paga" ||
+        /\b(arancelad[oa]|con entrada paga|con costo)\b/i.test(cleanBody);
 
       const verifiedFree =
         !isPaidAccess &&
-        ((ev.acceso === "sin_costo" || ev.acceso === "gratuito" || ev.acceso === "libre")
+        (ev.acceso === "sin_costo" || ev.acceso === "gratuito" || ev.acceso === "libre"
           ? !hasPaidTicketingLink || hasExplicitFreeBody
           : hasExplicitFreeBody);
 
@@ -125,7 +130,9 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
       const candidateDates = (ev.fechasDelEvento?.length ? ev.fechasDelEvento : [ev.fechaInicio])
         .filter((d): d is string => Boolean(d))
         .map((d) => new Date(d))
-        .filter((d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime)
+        .filter(
+          (d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime
+        )
         .sort((a, b) => a.getTime() - b.getTime());
 
       // If fechaInicio is in the past (long-running exhibition) but fechaFin is in the future, anchor to today 14:00 ART.
@@ -138,9 +145,15 @@ export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
       }
 
       const officialUrl = buildGcbaUrl(ev);
-      const sidebarTicketUrl = ev.botonesSidebar?.find((b) => b.uri?.startsWith("http"))?.uri ?? null;
-      const barrio = ev.barrio ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : null;
-      const cats = [...(ev.etiquetas ?? []), ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : [])];
+      const sidebarTicketUrl =
+        ev.botonesSidebar?.find((b) => b.uri?.startsWith("http"))?.uri ?? null;
+      const barrio = ev.barrio
+        ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+        : null;
+      const cats = [
+        ...(ev.etiquetas ?? []),
+        ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : []),
+      ];
 
       for (const startsAt of candidateDates.slice(0, 3)) {
         results.push({

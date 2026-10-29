@@ -19,7 +19,9 @@ async function main() {
 
   if (migrate) {
     const dir = join(process.cwd(), "supabase/migrations");
-    for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+    for (const file of readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .sort()) {
       await db.unsafe(readFileSync(join(dir, file), "utf8"));
       console.log(`✓ Applied supabase/migrations/${file}`);
     }
@@ -30,10 +32,7 @@ async function main() {
     console.log(`✓ Seeded ${seeded} CABA venues`);
   }
 
-  const sources: SourceId[] =
-    sourceArg === "all"
-      ? ALL_SOURCES
-      : ([sourceArg] as SourceId[]);
+  const sources: SourceId[] = sourceArg === "all" ? ALL_SOURCES : ([sourceArg] as SourceId[]);
 
   for (const s of sources) {
     console.log(`→ Ingesting ${s}...`);

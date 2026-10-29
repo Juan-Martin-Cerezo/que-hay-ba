@@ -5,7 +5,10 @@ import { buildGcbaUrl } from "./gcba";
 describe("buildGcbaUrl", () => {
   it("rewrites the retired /descubrir pathAlias to /eventos", () => {
     assert.equal(
-      buildGcbaUrl({ pathAlias: "/descubrir/congreso-de-informatica", slug: "congreso-de-informatica" }),
+      buildGcbaUrl({
+        pathAlias: "/descubrir/congreso-de-informatica",
+        slug: "congreso-de-informatica",
+      }),
       "https://linda.buenosaires.gob.ar/eventos/congreso-de-informatica"
     );
   });
@@ -18,11 +21,20 @@ describe("buildGcbaUrl", () => {
   });
 
   it("keeps absolute external links untouched", () => {
-    assert.equal(buildGcbaUrl({ pathAlias: "https://otro.sitio/x", slug: "x" }), "https://otro.sitio/x");
+    assert.equal(
+      buildGcbaUrl({ pathAlias: "https://otro.sitio/x", slug: "x" }),
+      "https://otro.sitio/x"
+    );
   });
 
   it("falls back to /agenda without a usable slug", () => {
-    assert.equal(buildGcbaUrl({ pathAlias: "/descubrir", slug: null }), "https://linda.buenosaires.gob.ar/agenda");
-    assert.equal(buildGcbaUrl({ pathAlias: null, slug: null }), "https://linda.buenosaires.gob.ar/agenda");
+    assert.equal(
+      buildGcbaUrl({ pathAlias: "/descubrir", slug: null }),
+      "https://linda.buenosaires.gob.ar/agenda"
+    );
+    assert.equal(
+      buildGcbaUrl({ pathAlias: null, slug: null }),
+      "https://linda.buenosaires.gob.ar/agenda"
+    );
   });
 });

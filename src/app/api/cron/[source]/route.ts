@@ -6,10 +6,7 @@ export const maxDuration = 60;
 
 const VALID_SOURCES = new Set<SourceId>(ALL_SOURCES);
 
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ source: string }> }
-) {
+export async function GET(req: NextRequest, ctx: { params: Promise<{ source: string }> }) {
   const secret = process.env.CRON_SECRET;
   const authHeader = req.headers.get("authorization");
   if (secret && authHeader !== `Bearer ${secret}`) {
@@ -26,7 +23,11 @@ export async function GET(
         const summary = await ingestSource(s, { enrichLimit: 18 });
         results.push({ ok: true, ...summary });
       } catch (err) {
-        results.push({ ok: false, source: s, error: err instanceof Error ? err.message : String(err) });
+        results.push({
+          ok: false,
+          source: s,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
     return NextResponse.json({ ok: true, results });

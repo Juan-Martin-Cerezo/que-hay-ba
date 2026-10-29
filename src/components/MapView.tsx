@@ -134,7 +134,11 @@ function buildStyle(theme: MapThemeId): StyleSpecification {
 }
 
 function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function clip(s: string, n: number): string {
@@ -178,7 +182,13 @@ export function MapView({
     for (const f of data.features) {
       const ev = f.properties;
       const key = `${ev.lat.toFixed(4)},${ev.lng.toFixed(4)}`;
-      const g = byKey.get(key) ?? { key, lat: ev.lat, lng: ev.lng, venueName: ev.venueName, events: [] };
+      const g = byKey.get(key) ?? {
+        key,
+        lat: ev.lat,
+        lng: ev.lng,
+        venueName: ev.venueName,
+        events: [],
+      };
       g.events.push(ev);
       byKey.set(key, g);
     }
@@ -242,7 +252,8 @@ export function MapView({
     if (!map) return;
 
     const visible = [...groups].sort((a, z) => {
-      const act = (g: VenueGroup) => (g.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0);
+      const act = (g: VenueGroup) =>
+        g.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0;
       return act(a) - act(z) || a.events.length - z.events.length;
     });
 
@@ -339,12 +350,17 @@ export function MapView({
           </span>
         </span>`;
       row.addEventListener("mouseenter", () => (row.style.background = "rgba(255,255,255,.05)"));
-      row.addEventListener("mouseleave", () => (row.style.background = ev.id === selectedId ? "rgba(245,184,74,.14)" : "transparent"));
+      row.addEventListener(
+        "mouseleave",
+        () => (row.style.background = ev.id === selectedId ? "rgba(245,184,74,.14)" : "transparent")
+      );
       row.addEventListener("click", () => onSelectRef.current(ev));
       box.appendChild(row);
     }
 
-    stackRef.current = new Marker({ element: box, anchor: "bottom" }).setLngLat([g.lng, g.lat]).addTo(map);
+    stackRef.current = new Marker({ element: box, anchor: "bottom" })
+      .setLngLat([g.lng, g.lat])
+      .addTo(map);
   }, [openStack, groups, selectedId]);
 
   useEffect(() => {
@@ -379,7 +395,9 @@ export function MapView({
       const el = document.createElement("div");
       el.style.cssText =
         "width:14px;height:14px;border-radius:999px;background:#38bdf8;border:2px solid #09090b;box-shadow:0 0 0 6px rgba(56,189,248,.22)";
-      userMarkerRef.current = new Marker({ element: el }).setLngLat([userLocation.lng, userLocation.lat]).addTo(map);
+      userMarkerRef.current = new Marker({ element: el })
+        .setLngLat([userLocation.lng, userLocation.lat])
+        .addTo(map);
     } else {
       userMarkerRef.current.setLngLat([userLocation.lng, userLocation.lat]);
     }

@@ -58,7 +58,9 @@ async function fetchTicketingPrices(obraId: string): Promise<{ min: number; max:
       resultado?: string;
       funciones?: Array<{ id?: string; fecha?: string; descripcion?: string }>;
     }>(await fRes.text());
-    const fn = fData?.funciones?.find((x) => x.id && x.fecha && !/agotado/i.test(x.descripcion ?? "")) ?? fData?.funciones?.[0];
+    const fn =
+      fData?.funciones?.find((x) => x.id && x.fecha && !/agotado/i.test(x.descripcion ?? "")) ??
+      fData?.funciones?.[0];
     if (!fn?.id || !fn?.fecha) return null;
 
     const pRes = await fetch(
@@ -84,7 +86,11 @@ async function fetchTicketingPrices(obraId: string): Promise<{ min: number; max:
   }
 }
 
-async function fetchShowDetail(obraId: string, urlPath: string, hasTicketsUrl: boolean): Promise<{
+async function fetchShowDetail(
+  obraId: string,
+  urlPath: string,
+  hasTicketsUrl: boolean
+): Promise<{
   isFree: boolean;
   priceMin: number | null;
   priceMax: number | null;
@@ -102,20 +108,28 @@ async function fetchShowDetail(obraId: string, urlPath: string, hasTicketsUrl: b
     const html = await res.text();
 
     // Extract from .content-funciones where actual venue prices live, avoiding nav <span class="mdc-list-item__text">Entradas</span>
-    const funcionesBlock = html.match(/<div[^>]*content-funciones[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "";
+    const funcionesBlock =
+      html.match(/<div[^>]*content-funciones[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "";
     const funcionesText = stripHtml(funcionesBlock);
     let parsed = parsePrice(funcionesText);
 
     // If HTML block had no explicit ARS amount and show uses Alternativa online ticketing, query the official JSONP ticketing API.
-    if (parsed.priceMin == null && !parsed.isFree && (hasTicketsUrl || /publico\.alternativateatral\.com\/entradas/i.test(html))) {
+    if (
+      parsed.priceMin == null &&
+      !parsed.isFree &&
+      (hasTicketsUrl || /publico\.alternativateatral\.com\/entradas/i.test(html))
+    ) {
       const apiPrices = await fetchTicketingPrices(obraId);
       if (apiPrices) {
         parsed = { isFree: false, priceMin: apiPrices.min, priceMax: apiPrices.max };
       }
     }
 
-    const ogDesc = html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ?? "";
-    const cleanedDesc = stripHtml(ogDesc.replace(/\s*en Alternativa\. Comunidad en escena\.?$/i, "")).trim();
+    const ogDesc =
+      html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ?? "";
+    const cleanedDesc = stripHtml(
+      ogDesc.replace(/\s*en Alternativa\. Comunidad en escena\.?$/i, "")
+    ).trim();
 
     return {
       isFree: parsed.isFree,
@@ -160,13 +174,15 @@ export async function fetchAlternativaEvents(enrichLimit = 35): Promise<RawEvent
 
   // Step 2: load cached show details from Postgres.
   const db = sql();
-  const cachedRows = await db<{
-    source_id: string;
-    is_free: boolean | null;
-    price_min: number | null;
-    price_max: number | null;
-    description: string | null;
-  }[]>`
+  const cachedRows = await db<
+    {
+      source_id: string;
+      is_free: boolean | null;
+      price_min: number | null;
+      price_max: number | null;
+      description: string | null;
+    }[]
+  >`
     select source_id, is_free, price_min, price_max, description
     from detail_cache
     where source = 'alternativa'

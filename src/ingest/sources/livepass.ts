@@ -30,7 +30,11 @@ const MONTHS_ES: Record<string, string> = {
   diciembre: "12",
 };
 
-function parseLivepassDate(dateText?: string | null, slug?: string | null, now = new Date()): Date | null {
+function parseLivepassDate(
+  dateText?: string | null,
+  slug?: string | null,
+  now = new Date()
+): Date | null {
   // 1. Check slug for explicit ISO date e.g. "...-2026-10-30-20-45-00-0300" or "...-2026-10-28"
   if (slug) {
     const isoFull = /(\d{4}-\d{2}-\d{2})-(\d{2})-(\d{2})-\d{2}-0300/.exec(slug);
@@ -46,10 +50,15 @@ function parseLivepassDate(dateText?: string | null, slug?: string | null, now =
 
   if (!dateText) return null;
   // Format: "Miércoles 28 de Octubre 20:45"
-  const m = /(\d{1,2})\s+de\s+([a-záéíóú]+)(?:\s+de\s+(\d{4}))?(?:\s+(\d{1,2}:\d{2}))?/i.exec(dateText);
+  const m = /(\d{1,2})\s+de\s+([a-záéíóú]+)(?:\s+de\s+(\d{4}))?(?:\s+(\d{1,2}:\d{2}))?/i.exec(
+    dateText
+  );
   if (!m) return null;
   const day = m[1].padStart(2, "0");
-  const monthKey = m[2].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const monthKey = m[2]
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
   const month = MONTHS_ES[monthKey];
   if (!month) return null;
 
@@ -93,7 +102,8 @@ export async function fetchLivepassEvents(): Promise<RawEvent[]> {
     if (!title || !location || !item.url) continue;
 
     // Filter out non-event entries (merchandising, test items) and non-CABA cities.
-    if (/\b(merchandising|membres[ií]a|prueba|abono|estacionamiento|voucher)\b/i.test(title)) continue;
+    if (/\b(merchandising|membres[ií]a|prueba|abono|estacionamiento|voucher)\b/i.test(title))
+      continue;
     if (
       /\b(la plata|san miguel|quilmes|temperley|haedo|ituzaing[oó]|mar del plata|rosario|c[oó]rdoba|mendoza| Pilar|escobar|lomas de zamora|lan[uú]s|avellaneda|mor[oó]n|ramos mej[ií]a|san isidro|vicente l[oó]pez|tigre)\b/i.test(
         `${title} ${location}`
@@ -101,7 +111,11 @@ export async function fetchLivepassEvents(): Promise<RawEvent[]> {
     ) {
       continue;
     }
-    if (!/\b(buenos aires|caba|capital federal|palermo|colegiales|devoto|chacarita|recoleta|centro)\b/i.test(location)) {
+    if (
+      !/\b(buenos aires|caba|capital federal|palermo|colegiales|devoto|chacarita|recoleta|centro)\b/i.test(
+        location
+      )
+    ) {
       continue;
     }
 
@@ -109,10 +123,13 @@ export async function fetchLivepassEvents(): Promise<RawEvent[]> {
     if (!startsAt || startsAt.getTime() < now - 4 * 3600_000) continue;
 
     const rawPrice = item.price != null ? Math.round(Number(item.price)) : null;
-    const validPrice = rawPrice != null && Number.isFinite(rawPrice) && rawPrice >= 500 ? rawPrice : null;
+    const validPrice =
+      rawPrice != null && Number.isFinite(rawPrice) && rawPrice >= 500 ? rawPrice : null;
 
     const venueName = extractVenueName(title, location);
-    const streetAddress = location.replace(/,?\s*(ciudad aut[oó]noma de )?buenos aires.*$/i, "").trim();
+    const streetAddress = location
+      .replace(/,?\s*(ciudad aut[oó]noma de )?buenos aires.*$/i, "")
+      .trim();
 
     out.push({
       source: "livepass",
