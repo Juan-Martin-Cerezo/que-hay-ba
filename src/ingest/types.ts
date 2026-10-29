@@ -1,4 +1,4 @@
-export type SourceId = "eventbrite" | "alternativa" | "gcba";
+export type SourceId = "eventbrite" | "alternativa" | "gcba" | "livepass" | "cultura_nacion" | "recoleta";
 
 export interface RawEvent {
   source: SourceId;

@@ -13,13 +13,7 @@ interface FavoritesDrawerProps {
   onRemove: (item: FavoriteItem) => void;
 }
 
-export function FavoritesDrawer({
-  open,
-  items,
-  onClose,
-  onSelect,
-  onRemove,
-}: FavoritesDrawerProps) {
+export function FavoritesDrawer({ open, items, onClose, onSelect, onRemove }: FavoritesDrawerProps) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -30,10 +24,7 @@ export function FavoritesDrawer({
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div
         role="dialog"
         aria-label="Guardados"
@@ -43,21 +34,19 @@ export function FavoritesDrawer({
         <header className="flex items-end justify-between px-5 pb-4 pt-[max(1.25rem,env(safe-area-inset-top))]">
           <div>
             <h2 className="font-display text-3xl leading-none">Guardados</h2>
-            <p className="mt-1.5 font-mono text-[11px] text-muted">
-              {items.length} en este dispositivo
-            </p>
+            <p className="mt-1.5 font-mono text-[11px] text-muted">{items.length} en este dispositivo</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-line text-muted hover:text-fg"
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-line text-muted transition hover:text-fg active:scale-95"
           >
             ✕
           </button>
         </header>
 
-        <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto border-t border-line">
+        <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto border-t border-line pb-[max(1rem,env(safe-area-inset-bottom))]">
           {items.length === 0 ? (
             <li className="px-5 py-12 text-center text-sm text-muted">
               Tocá el marcador en cualquier actividad para guardarla acá.
@@ -67,15 +56,8 @@ export function FavoritesDrawer({
               const cat = categoryById[item.category] ?? categoryById.arte;
               return (
                 <li key={item.id} className="flex items-start gap-3 px-5 py-4">
-                  <span
-                    className="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                    style={{ background: cat.color }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => onSelect(item)}
-                    className="min-w-0 flex-1 text-left"
-                  >
+                  <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: cat.color }} />
+                  <button type="button" onClick={() => onSelect(item)} className="min-w-0 flex-1 cursor-pointer text-left">
                     <span className="line-clamp-2 text-sm font-medium text-fg">{item.title}</span>
                     <span className="mt-1 block truncate font-mono text-[11px] text-muted">
                       {formatEventDate(item.startsAt)} · {item.venueName}
@@ -85,7 +67,7 @@ export function FavoritesDrawer({
                     type="button"
                     onClick={() => onRemove(item)}
                     aria-label="Quitar"
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:text-fg"
+                    className="flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full text-muted transition hover:bg-raised hover:text-fg"
                   >
                     ✕
                   </button>

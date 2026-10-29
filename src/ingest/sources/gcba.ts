@@ -20,6 +20,7 @@ interface GcbaEvent {
   link?: string | null;
   pathAlias?: string | null;
   slug?: string | null;
+  botonesSidebar?: Array<{ uri?: string; title?: string }>;
   ubicacion?: {
     titulo?: string | null;
     direccion?: string | null;
@@ -39,55 +40,44 @@ interface GcbaResponse {
 
 const BASE = "https://linda.buenosaires.gob.ar";
 
-/**
- * Linda's API advertises /descubrir/<slug> for events, but that route is gone:
- * the public page lives at /eventos/<slug>.
- */
-export function gcbaEventUrl(pathAlias?: string | null, slug?: string | null): string {
-  const raw = pathAlias || (slug ? `/descubrir/${slug}` : "/agenda");
-  const path = raw.replace("/descubrir/", "/eventos/");
-  return path.startsWith("http") ? path : `${BASE}${path}`;
+// The API still reports the retired /descubrir/<slug> pathAlias; live pages live at /eventos/<slug>.
+export function buildGcbaUrl(ev: Pick<GcbaEvent, "pathAlias" | "slug">): string {
+  const path = ev.pathAlias || (ev.slug ? `/eventos/${ev.slug}` : "/agenda");
+  if (path.startsWith("http")) return path;
+  const fixed = path.replace(/^\/descubrir\/?(.*)$/, (_m, rest: string) => (rest ? `/eventos/${rest}` : "/agenda"));
+  return `${BASE}${fixed}`;
 }
 
-async function fetchPage(page: number): Promise<GcbaResponse | null> {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const res = await fetch(`${BASE}/api/frontend/events/filter?page=${page}&limit=50`, {
-        headers: {
-          Accept: "application/json",
-          "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) QueHayBA/1.0",
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (res.ok) return (await res.json()) as GcbaResponse;
-    } catch {
-      // Retry below; a timeout here should not abort the whole run.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
-  }
-  return null;
-}
-
-export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
+export async function fetchGcbaEvents(maxPages = 8): Promise<RawEvent[]> {
   const results: RawEvent[] = [];
   const now = Date.now();
   const minTime = now - 6 * 3600_000;
-  const maxTime = now + 45 * 86_400_000;
-
-  // Linda ignores `limit` and serves the same payload on every page, so a single
-  // request holds the whole agenda. Keep the loop for the day it starts paging.
-  const seenIds = new Set<string>();
+  const maxTime = now + 90 * 86_400_000;
 
   let totalPages = 1;
   for (let page = 1; page <= Math.min(totalPages, maxPages); page++) {
-    const data = await fetchPage(page);
-    if (!data) break;
-    totalPages = data.pagination?.totalPages ?? 1;
+    let data: GcbaResponse | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`${BASE}/api/frontend/events/filter?page=${page}&limit=50`, {
+          headers: {
+            Accept: "application/json",
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) QueHayBA/1.0",
+          },
+          signal: AbortSignal.timeout(15000),
+        });
+        if (res.ok) {
+          data = (await res.json()) as GcbaResponse;
+          break;
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
+    }
+    if (!data) continue;
+    totalPages = data.pagination?.totalPages ?? totalPages;
 
     for (const ev of data.events ?? []) {
-      if (seenIds.has(ev.id)) continue;
-      seenIds.add(ev.id);
-
       const title = (ev.title ?? "").trim();
       if (!title) continue;
 
@@ -101,27 +91,41 @@ export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
       if (!lat && !address) continue;
 
       const bodyHtml = [ev.description ?? "", ...(ev.componentes ?? [])].join("\n");
-      const description = stripHtml(bodyHtml).slice(0, 1200) || null;
+      const cleanBody = stripHtml(bodyHtml).replace(
+        /Este es un espacio de difusi[oó]n abierto y gratuito[\s\S]*$/i,
+        ""
+      ).trim();
+      const description = cleanBody.slice(0, 1200) || null;
 
-      const isSinCosto =
-        ev.acceso === "sin_costo" ||
-        ev.acceso === "gratuito" ||
-        ev.acceso === "libre" ||
-        /entrada libre y gratuita|sin costo|actividad gratuita/i.test(description ?? "");
+      // ponytail: strict GCBA price verification — never trust sin_costo if it links to a paid ticketing portal without explicit free confirmation in the body
+      const sidebarUris = (ev.botonesSidebar ?? []).map((b) => `${b.title ?? ""} ${b.uri ?? ""}`).join(" ");
+      const hasPaidTicketingLink =
+        /ticketek|allaccess|plateanet|tuentrada|passline|entradauno|movistararena|alternativateatral|complejoteatral|entradasba\.buenosaires\.gob\.ar/i.test(
+          `${ev.link ?? ""} ${sidebarUris}`
+        );
+      const hasExplicitFreeBody =
+        /\b(entrada libre y gratuita|libre y gratuit[oa]|entrada gratuita|actividad gratuita|sin costo|sin cargo|acceso libre y gratuito|acceso gratuito)\b/i.test(
+          cleanBody
+        );
+      const isPaidAccess = ev.acceso === "con_entrada_paga" || /\b(arancelad[oa]|con entrada paga|con costo)\b/i.test(cleanBody);
+
+      const verifiedFree =
+        !isPaidAccess &&
+        ((ev.acceso === "sin_costo" || ev.acceso === "gratuito" || ev.acceso === "libre")
+          ? !hasPaidTicketingLink || hasExplicitFreeBody
+          : hasExplicitFreeBody);
 
       const priceInfo = parsePrice(
-        typeof ev.precio === "string" ? ev.precio : description,
-        isSinCosto ? true : null,
-        typeof ev.precio === "number" ? ev.precio : null
+        typeof ev.precio === "string" ? `${ev.precio}\n${cleanBody}` : cleanBody,
+        isPaidAccess ? false : verifiedFree ? true : null,
+        typeof ev.precio === "number" && ev.precio > 0 ? ev.precio : null
       );
 
       // Determine upcoming date(s) for this event (up to 3 nearest future occurrences).
       const candidateDates = (ev.fechasDelEvento?.length ? ev.fechasDelEvento : [ev.fechaInicio])
         .filter((d): d is string => Boolean(d))
         .map((d) => new Date(d))
-        .filter(
-          (d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime
-        )
+        .filter((d) => !Number.isNaN(d.getTime()) && d.getTime() >= minTime && d.getTime() <= maxTime)
         .sort((a, b) => a.getTime() - b.getTime());
 
       // If fechaInicio is in the past (long-running exhibition) but fechaFin is in the future, anchor to today 14:00 ART.
@@ -133,14 +137,10 @@ export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
         }
       }
 
-      const officialUrl = gcbaEventUrl(ev.pathAlias, ev.slug);
-      const barrio = ev.barrio
-        ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-        : null;
-      const cats = [
-        ...(ev.etiquetas ?? []),
-        ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : []),
-      ];
+      const officialUrl = buildGcbaUrl(ev);
+      const sidebarTicketUrl = ev.botonesSidebar?.find((b) => b.uri?.startsWith("http"))?.uri ?? null;
+      const barrio = ev.barrio ? ev.barrio.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) : null;
+      const cats = [...(ev.etiquetas ?? []), ...(ev.tipoEvento ? [ev.tipoEvento.replace(/_/g, " ")] : [])];
 
       for (const startsAt of candidateDates.slice(0, 3)) {
         results.push({
@@ -150,7 +150,7 @@ export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
           description,
           imageUrl: ev.imageUrl || ev.imagenes?.[0] || null,
           url: officialUrl,
-          ticketsUrl: ev.link || officialUrl,
+          ticketsUrl: ev.link || sidebarTicketUrl || officialUrl,
           startsAt,
           endsAt: new Date(startsAt.getTime() + 2 * 3600_000),
           venueName,
@@ -165,10 +165,6 @@ export async function fetchGcbaEvents(maxPages = 1): Promise<RawEvent[]> {
         });
       }
     }
-  }
-
-  if (results.length === 0) {
-    throw new Error("GCBA returned no usable events");
   }
 
   return results;

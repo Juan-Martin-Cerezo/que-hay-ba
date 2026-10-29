@@ -12,26 +12,52 @@ import {
 } from "./normalise";
 
 describe("parsePrice", () => {
-  it("detects free events in Spanish text", () => {
+  it("detects genuinely free events in Spanish text", () => {
     assert.deepEqual(parsePrice("Entrada libre y gratuita, por orden de llegada"), {
       isFree: true,
       priceMin: 0,
       priceMax: 0,
     });
-    assert.deepEqual(parsePrice("Espectáculo a la gorra"), {
+    assert.deepEqual(parsePrice("Actividad sin costo con inscripción previa"), {
       isFree: true,
       priceMin: 0,
       priceMax: 0,
     });
   });
 
-  it("extracts ARS ranges and formatted prices", () => {
+  it("refuses to mark a la gorra or arancelada or disclaimer-only text as Gratis", () => {
+    assert.deepEqual(parsePrice("Espectáculo a la gorra"), {
+      isFree: false,
+      priceMin: null,
+      priceMax: null,
+    });
+    assert.deepEqual(
+      parsePrice("Actividad arancelada. Los miércoles la entrada es sin costo."),
+      {
+        isFree: false,
+        priceMin: null,
+        priceMax: null,
+      }
+    );
+    assert.deepEqual(
+      parsePrice(
+        "Encuentro anual. Este es un espacio de difusión abierto y gratuito. El contenido de eventos de privados..."
+      ),
+      {
+        isFree: false,
+        priceMin: null,
+        priceMax: null,
+      }
+    );
+  });
+
+  it("extracts ARS ranges and formatted prices even when explicitFree is passed", () => {
     assert.deepEqual(parsePrice("Entradas desde: $ 10.000,00 - Viernes 21:00 hs"), {
       isFree: false,
       priceMin: 10000,
       priceMax: 10000,
     });
-    assert.deepEqual(parsePrice("General $8.000 / Platea $15.000"), {
+    assert.deepEqual(parsePrice("General $8.000 / Platea $15.000", true), {
       isFree: false,
       priceMin: 8000,
       priceMax: 15000,
@@ -41,7 +67,7 @@ describe("parsePrice", () => {
   it("returns null bounds when price is unparseable", () => {
     const p = parsePrice("Consultar en boletería");
     assert.deepEqual(p, { isFree: false, priceMin: null, priceMax: null });
-    assert.equal(formatPriceLabel(p.isFree, p.priceMin, p.priceMax), "Precio a confirmar");
+    assert.equal(formatPriceLabel(p.isFree, p.priceMin, p.priceMax), "Precio no informado");
   });
 });
 

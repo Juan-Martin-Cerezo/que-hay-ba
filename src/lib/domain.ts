@@ -81,6 +81,9 @@ export const SOURCE_LABELS: Record<string, string> = {
   eventbrite: "Eventbrite",
   alternativa: "Alternativa Teatral",
   gcba: "Agenda Cultural BA",
+  livepass: "Livepass",
+  cultura_nacion: "Cultura Nación",
+  recoleta: "CC Recoleta",
 };
 
 // Argentina has had no DST since 2009: a fixed UTC-3 offset is exact.

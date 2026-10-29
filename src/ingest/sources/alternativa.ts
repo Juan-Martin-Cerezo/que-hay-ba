@@ -33,7 +33,58 @@ interface AtObra {
 
 const UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36";
 
-async function fetchShowDetail(urlPath: string): Promise<{
+function unwrapJsonp<T>(text: string): T | null {
+  const lpar = text.indexOf("(");
+  const rpar = text.lastIndexOf(")");
+  if (lpar === -1 || rpar <= lpar) return null;
+  try {
+    return JSON.parse(text.slice(lpar + 1, rpar).replace(/^\uFEFF/, "")) as T;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchTicketingPrices(obraId: string): Promise<{ min: number; max: number } | null> {
+  try {
+    const fRes = await fetch(
+      `https://publico1.alternativateatral.com/api/formulario-localidades.asp?id=${obraId}&o=14&m=&c=&callback=cb`,
+      {
+        headers: { "User-Agent": UA, Referer: "https://publico.alternativateatral.com/" },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (!fRes.ok) return null;
+    const fData = unwrapJsonp<{
+      resultado?: string;
+      funciones?: Array<{ id?: string; fecha?: string; descripcion?: string }>;
+    }>(await fRes.text());
+    const fn = fData?.funciones?.find((x) => x.id && x.fecha && !/agotado/i.test(x.descripcion ?? "")) ?? fData?.funciones?.[0];
+    if (!fn?.id || !fn?.fecha) return null;
+
+    const pRes = await fetch(
+      `https://publico1.alternativateatral.com/api/cargar-parametros-funcion.asp?id=${fn.id}-${fn.fecha}&o=14&m=&c=&callback=cb`,
+      {
+        headers: { "User-Agent": UA, Referer: "https://publico.alternativateatral.com/" },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (!pRes.ok) return null;
+    const pData = unwrapJsonp<{
+      resultado?: string;
+      precios?: Array<{ importe?: string | number; moneda?: string }>;
+    }>(await pRes.text());
+    const vals = (pData?.precios ?? [])
+      .filter((p) => !p.moneda || p.moneda === "$" || p.moneda === "ARS")
+      .map((p) => Math.round(Number(p.importe)))
+      .filter((v) => Number.isFinite(v) && v >= 500 && v <= 2_000_000);
+    if (!vals.length) return null;
+    return { min: Math.min(...vals), max: Math.max(...vals) };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchShowDetail(obraId: string, urlPath: string, hasTicketsUrl: boolean): Promise<{
   isFree: boolean;
   priceMin: number | null;
   priceMax: number | null;
@@ -50,17 +101,21 @@ async function fetchShowDetail(urlPath: string): Promise<{
     if (!res.ok) return null;
     const html = await res.text();
 
-    const priceLine =
-      html.match(/Entradas[^<]{0,120}/i)?.[0] ??
-      html.match(/(?:Entrada libre|A la gorra|Gratis|\$\s*[0-9.]{4,10})[^<]{0,80}/i)?.[0] ??
-      "";
-    const parsed = parsePrice(priceLine);
+    // Extract from .content-funciones where actual venue prices live, avoiding nav <span class="mdc-list-item__text">Entradas</span>
+    const funcionesBlock = html.match(/<div[^>]*content-funciones[^>]*>([\s\S]*?)<\/div>/i)?.[1] ?? "";
+    const funcionesText = stripHtml(funcionesBlock);
+    let parsed = parsePrice(funcionesText);
 
-    const ogDesc =
-      html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ?? "";
-    const cleanedDesc = stripHtml(
-      ogDesc.replace(/\s*en Alternativa\. Comunidad en escena\.?$/i, "")
-    ).trim();
+    // If HTML block had no explicit ARS amount and show uses Alternativa online ticketing, query the official JSONP ticketing API.
+    if (parsed.priceMin == null && !parsed.isFree && (hasTicketsUrl || /publico\.alternativateatral\.com\/entradas/i.test(html))) {
+      const apiPrices = await fetchTicketingPrices(obraId);
+      if (apiPrices) {
+        parsed = { isFree: false, priceMin: apiPrices.min, priceMax: apiPrices.max };
+      }
+    }
+
+    const ogDesc = html.match(/property=["']og:description["']\s+content=["']([^"']+)["']/i)?.[1] ?? "";
+    const cleanedDesc = stripHtml(ogDesc.replace(/\s*en Alternativa\. Comunidad en escena\.?$/i, "")).trim();
 
     return {
       isFree: parsed.isFree,
@@ -105,34 +160,38 @@ export async function fetchAlternativaEvents(enrichLimit = 35): Promise<RawEvent
 
   // Step 2: load cached show details from Postgres.
   const db = sql();
-  const cachedRows = await db<
-    {
-      source_id: string;
-      is_free: boolean | null;
-      price_min: number | null;
-      price_max: number | null;
-      description: string | null;
-    }[]
-  >`
+  const cachedRows = await db<{
+    source_id: string;
+    is_free: boolean | null;
+    price_min: number | null;
+    price_max: number | null;
+    description: string | null;
+  }[]>`
     select source_id, is_free, price_min, price_max, description
     from detail_cache
     where source = 'alternativa'
   `;
   const detailMap = new Map(cachedRows.map((r) => [r.source_id, r]));
 
-  // Enrich up to enrichLimit uncached CABA shows concurrently (in small batches of 6).
+  // Enrich up to enrichLimit uncached (or previously price-less) CABA shows concurrently (in batches of 8).
   const cabaShowIds = Object.entries(shows)
     .filter(([, s]) => Object.values(s.lugares ?? {}).some((l) => l.provincia === "CABA"))
     .map(([id]) => id);
-  const toEnrich = cabaShowIds.filter((id) => !detailMap.has(id)).slice(0, enrichLimit);
+  const toEnrich = cabaShowIds
+    .filter((id) => {
+      const c = detailMap.get(id);
+      if (!c) return true;
+      return c.price_min == null && !c.is_free && Boolean(shows[id]?.url_entradas);
+    })
+    .slice(0, enrichLimit);
 
-  for (let i = 0; i < toEnrich.length; i += 6) {
-    const batch = toEnrich.slice(i, i + 6);
+  for (let i = 0; i < toEnrich.length; i += 8) {
+    const batch = toEnrich.slice(i, i + 8);
     await Promise.all(
       batch.map(async (obraId) => {
         const obra = shows[obraId];
         if (!obra?.url) return;
-        const det = await fetchShowDetail(obra.url);
+        const det = await fetchShowDetail(obraId, obra.url, Boolean(obra.url_entradas));
         if (!det) return;
         detailMap.set(obraId, {
           source_id: obraId,

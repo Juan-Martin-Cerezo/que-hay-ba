@@ -1,11 +1,11 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "dotenv";
 
 config({ path: ".env.local" });
 config();
 
-import { ingestSource, seedVenues } from "../src/ingest/run";
+import { ALL_SOURCES, ingestSource, seedVenues } from "../src/ingest/run";
 import type { SourceId } from "../src/ingest/types";
 import { sql } from "../src/lib/db";
 
@@ -19,11 +19,7 @@ async function main() {
 
   if (migrate) {
     const dir = join(process.cwd(), "supabase/migrations");
-    // Migrations are written to be re-runnable, so every deploy applies all of them in order.
-    const files = readdirSync(dir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort();
-    for (const file of files) {
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
       await db.unsafe(readFileSync(join(dir, file), "utf8"));
       console.log(`✓ Applied supabase/migrations/${file}`);
     }
@@ -35,14 +31,20 @@ async function main() {
   }
 
   const sources: SourceId[] =
-    sourceArg === "all" ? ["gcba", "eventbrite", "alternativa"] : ([sourceArg] as SourceId[]);
+    sourceArg === "all"
+      ? ALL_SOURCES
+      : ([sourceArg] as SourceId[]);
 
   for (const s of sources) {
     console.log(`→ Ingesting ${s}...`);
-    const summary = await ingestSource(s, { enrichLimit: 80 });
-    console.log(
-      `✓ ${summary.source}: fetched=${summary.fetched} upserted=${summary.upserted} pruned=${summary.pruned} (${summary.durationMs}ms)`
-    );
+    try {
+      const summary = await ingestSource(s, { enrichLimit: 80 });
+      console.log(
+        `✓ ${summary.source}: fetched=${summary.fetched} upserted=${summary.upserted} pruned=${summary.pruned} (${summary.durationMs}ms)`
+      );
+    } catch (err) {
+      console.error(`✗ ${s} failed:`, err instanceof Error ? err.message : err);
+    }
   }
 
   const [totals] = await db<{ events: number; venues: number }[]>`

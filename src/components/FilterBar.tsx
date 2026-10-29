@@ -28,9 +28,9 @@ interface FilterBarProps {
 }
 
 const chip =
-  "shrink-0 rounded-full border px-2.5 py-1 text-[11.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-accent";
-const chipIdle = "border-line bg-ink/50 text-muted hover:border-white/20 hover:text-fg";
-const chipOn = "border-fg bg-fg text-ink font-semibold";
+  "shrink-0 min-h-9 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer select-none focus-visible:outline-2 focus-visible:outline-accent active:scale-[0.98]";
+const chipIdle = "border-line bg-ink/70 text-muted hover:border-white/25 hover:text-fg";
+const chipOn = "border-fg bg-fg text-ink font-semibold shadow-sm";
 
 export function FilterBar({
   filters,
@@ -43,10 +43,7 @@ export function FilterBar({
   const [more, setMore] = useState(false);
   const customDate = /^\d{4}-\d{2}-\d{2}$/.test(filters.when) ? filters.when : "";
   const activeCount =
-    (filters.q ? 1 : 0) +
-    (filters.when ? 1 : 0) +
-    (filters.price ? 1 : 0) +
-    filters.categories.length;
+    (filters.q ? 1 : 0) + (filters.when ? 1 : 0) + (filters.price ? 1 : 0) + filters.categories.length;
 
   const toggleCat = (id: CategoryId) =>
     onChange({
@@ -68,7 +65,7 @@ export function FilterBar({
             fill="none"
             stroke="currentColor"
             strokeWidth="2"
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
+            className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
           >
             <circle cx="11" cy="11" r="7" />
             <path d="m20 20-3.5-3.5" />
@@ -79,14 +76,14 @@ export function FilterBar({
             onFocus={onFocusSearch}
             onChange={(e) => onChange({ ...filters, q: e.target.value })}
             placeholder="Obra, banda, museo, barrio…"
-            className="h-10 w-full rounded-xl border border-line bg-raised pl-9 pr-8 text-xs text-fg placeholder:text-muted/70 focus:border-white/25 focus:outline-none"
+            className="h-11 w-full rounded-xl border border-line bg-raised pl-10 pr-10 text-base md:text-sm text-fg placeholder:text-muted/80 focus:border-accent/60 focus:outline-none"
           />
           {filters.q && (
             <button
               type="button"
               onClick={() => onChange({ ...filters, q: "" })}
               aria-label="Limpiar búsqueda"
-              className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-fg"
+              className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:text-fg"
             >
               ✕
             </button>
@@ -97,34 +94,25 @@ export function FilterBar({
           type="button"
           aria-expanded={more}
           onClick={() => setMore((v) => !v)}
-          className={`flex h-10 shrink-0 items-center gap-1.5 rounded-xl border px-3 text-xs font-medium transition-colors ${
-            more ||
-            customDate ||
-            (filters.price && filters.price !== "free") ||
-            activeZone !== "all"
+          className={`flex h-11 shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border px-3.5 text-xs font-medium transition-colors ${
+            more || customDate || (filters.price && filters.price !== "free") || activeZone !== "all"
               ? "border-accent bg-accent/15 text-accent"
               : "border-line bg-raised text-muted hover:text-fg"
           }`}
         >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="h-3.5 w-3.5"
-          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
           <span>Filtros</span>
           {activeCount > 0 && (
-            <span className="rounded-full bg-accent px-1.5 py-0.2 font-mono text-[10px] font-bold text-ink">
+            <span className="rounded-full bg-accent px-1.5 py-0.5 font-mono text-[10px] font-bold text-ink">
               {activeCount}
             </span>
           )}
         </button>
       </div>
 
-      {/* When + Gratis */}
+      {/* When + Gratis + Categories unified on compact/mobile, or split on desktop */}
       <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
         {WHEN_FILTERS.map((w) => {
           const on = filters.when === w.id;
@@ -155,9 +143,26 @@ export function FilterBar({
         >
           $0 Gratis
         </button>
+        {compact &&
+          CATEGORIES.map((c) => {
+            const on = filters.categories.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => toggleCat(c.id)}
+                className={`${chip} flex items-center gap-1.5 ${on ? "text-ink font-semibold" : chipIdle}`}
+                style={on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined}
+              >
+                <span className="text-xs leading-none">{c.emoji}</span>
+                <span>{c.shortLabel}</span>
+              </button>
+            );
+          })}
       </div>
 
-      {/* Categories */}
+      {/* Categories row on larger viewports */}
       {!compact && (
         <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
           {CATEGORIES.map((c) => {
@@ -169,9 +174,7 @@ export function FilterBar({
                 aria-pressed={on}
                 onClick={() => toggleCat(c.id)}
                 className={`${chip} flex items-center gap-1.5 ${on ? "text-ink font-semibold" : chipIdle}`}
-                style={
-                  on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined
-                }
+                style={on ? { background: c.color, borderColor: c.color, color: "#09090b" } : undefined}
               >
                 <span className="text-xs leading-none">{c.emoji}</span>
                 <span>{c.shortLabel}</span>
@@ -182,20 +185,23 @@ export function FilterBar({
       )}
 
       {more && (
-        <div className="space-y-3 rounded-2xl border border-line bg-raised/95 p-3 shadow-xl">
+        <div className="max-h-[60dvh] space-y-3 overflow-y-auto overscroll-contain rounded-2xl border border-line bg-raised/98 p-3.5 shadow-2xl">
           <Group title="Barrio / Zona">
             {CABA_ZONES.map((z) => (
               <button
                 key={z.id}
                 type="button"
-                onClick={() => onSelectZone(z)}
+                onClick={() => {
+                  onSelectZone(z);
+                  if (compact) setMore(false);
+                }}
                 className={`${chip} ${activeZone === z.id ? chipOn : chipIdle}`}
               >
                 {z.label}
               </button>
             ))}
           </Group>
-          <Group title="Presupuesto">
+          <Group title="Presupuesto confirmado">
             {PRICE_FILTERS.map((p) => {
               const on = filters.price === p.id;
               return (
@@ -210,25 +216,37 @@ export function FilterBar({
               );
             })}
           </Group>
-          <div className="flex items-center justify-between gap-2 pt-1">
-            <input
-              type="date"
-              value={customDate}
-              onChange={(e) => onChange({ ...filters, when: e.target.value })}
-              className="h-8 rounded-lg border border-line bg-ink px-2.5 font-mono text-xs text-fg focus:border-white/25 focus:outline-none"
-            />
-            {activeCount > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <label className="flex items-center gap-2 text-xs text-muted">
+              <span className="font-mono text-[10px] uppercase tracking-wider">Fecha:</span>
+              <input
+                type="date"
+                value={customDate}
+                onChange={(e) => onChange({ ...filters, when: e.target.value })}
+                className="h-10 rounded-xl border border-line bg-ink px-3 font-mono text-sm text-fg focus:border-accent/60 focus:outline-none"
+              />
+            </label>
+            <div className="flex items-center gap-3">
+              {activeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(EMPTY_FILTERS);
+                    setMore(false);
+                  }}
+                  className="min-h-10 px-2 text-xs font-medium text-accent hover:underline"
+                >
+                  Limpiar todo
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  onChange(EMPTY_FILTERS);
-                  setMore(false);
-                }}
-                className="text-xs font-medium text-accent hover:underline"
+                onClick={() => setMore(false)}
+                className="min-h-10 rounded-xl bg-fg px-3.5 text-xs font-semibold text-ink"
               >
-                Limpiar todo
+                Listo
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}

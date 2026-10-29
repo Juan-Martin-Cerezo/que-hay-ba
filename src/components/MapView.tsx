@@ -134,11 +134,7 @@ function buildStyle(theme: MapThemeId): StyleSpecification {
 }
 
 function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function clip(s: string, n: number): string {
@@ -148,9 +144,9 @@ function clip(s: string, n: number): string {
 /** Map padding so fly-to targets stay clear of the sidebar (md+) or mobile sheets. */
 function panelPadding() {
   if (typeof window === "undefined") return { top: 24, right: 24, bottom: 24, left: 24 };
-  return window.innerWidth >= 768
-    ? { top: 32, right: 32, bottom: 32, left: 420 }
-    : { top: 140, right: 16, bottom: 190, left: 16 };
+  if (window.innerWidth >= 1024) return { top: 32, right: 32, bottom: 32, left: 428 };
+  if (window.innerWidth >= 768) return { top: 24, right: 24, bottom: 24, left: 380 };
+  return { top: 148, right: 16, bottom: 210, left: 16 };
 }
 
 export function MapView({
@@ -169,26 +165,20 @@ export function MapView({
   const stackRef = useRef<Marker | null>(null);
   const onSelectRef = useRef(onSelectEvent);
   const [openStack, setOpenStack] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
+  const [detailed, setDetailed] = useState(false);
   const [webglError, setWebglError] = useState(false);
 
   useEffect(() => {
     onSelectRef.current = onSelectEvent;
   }, [onSelectEvent]);
 
-  // Events at the same venue collapse into a single marker.
+  // Experiences sharing the same venue collapse into one globito.
   const groups = useMemo<VenueGroup[]>(() => {
     const byKey = new Map<string, VenueGroup>();
     for (const f of data.features) {
       const ev = f.properties;
       const key = `${ev.lat.toFixed(4)},${ev.lng.toFixed(4)}`;
-      const g = byKey.get(key) ?? {
-        key,
-        lat: ev.lat,
-        lng: ev.lng,
-        venueName: ev.venueName,
-        events: [],
-      };
+      const g = byKey.get(key) ?? { key, lat: ev.lat, lng: ev.lng, venueName: ev.venueName, events: [] };
       g.events.push(ev);
       byKey.set(key, g);
     }
@@ -213,8 +203,7 @@ export function MapView({
         attributionControl: false,
       });
     } catch {
-      // MapLibre throws when no WebGL context is available.
-      requestAnimationFrame(() => setWebglError(true));
+      queueMicrotask(() => setWebglError(true));
       return;
     }
 
@@ -222,12 +211,12 @@ export function MapView({
     map.addControl(new NavigationControl({ showCompass: false }), "bottom-right");
     map.setPadding(panelPadding());
 
-    const bump = () => setTick((t) => t + 1);
+    const syncZoom = () => setDetailed(map.getZoom() >= 13.6);
     map.on("load", () => {
       map.resize();
-      bump();
+      syncZoom();
     });
-    map.on("moveend", bump);
+    map.on("zoomend", syncZoom);
     map.on("click", () => setOpenStack(null));
 
     const ro = new ResizeObserver(() => {
@@ -247,30 +236,15 @@ export function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // One HTML marker per venue, limited to the viewport and to a zoom-based cap.
+  // Globitos: HTML markers, one per venue — ALWAYS show every bubble across the map; full-text labels appear on zoom.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const b = map.getBounds();
-    const zoom = map.getZoom();
-    const detailed = zoom >= 13.6;
-    // Fewer pins at low zoom: 180 markers over the whole city read as noise.
-    const cap = zoom >= 15 ? 120 : zoom >= 13.6 ? 80 : 48;
 
-    const visible = groups
-      .filter(
-        (g) =>
-          g.lng >= b.getWest() &&
-          g.lng <= b.getEast() &&
-          g.lat >= b.getSouth() &&
-          g.lat <= b.getNorth()
-      )
-      .sort((a, z) => {
-        const act = (g: VenueGroup) =>
-          g.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0;
-        return act(z) - act(a) || z.events.length - a.events.length;
-      })
-      .slice(0, cap);
+    const visible = [...groups].sort((a, z) => {
+      const act = (g: VenueGroup) => (g.events.some((e) => e.id === selectedId || e.id === hoveredId) ? 1 : 0);
+      return act(a) - act(z) || a.events.length - z.events.length;
+    });
 
     pinsRef.current.forEach((m) => m.remove());
     pinsRef.current = [];
@@ -286,31 +260,37 @@ export function MapView({
       const el = document.createElement("button");
       el.type = "button";
       el.setAttribute("aria-label", n > 1 ? `${n} experiencias en ${g.venueName}` : first.title);
-      el.style.cssText = `background:none;border:0;padding:0;cursor:pointer;z-index:${selected ? 30 : hovered ? 20 : n > 1 ? 2 : 1};`;
+      el.style.cssText = `background:none;border:0;padding:3px;cursor:pointer;z-index:${selected ? 30 : hovered ? 20 : n > 1 ? 2 : 1};`;
 
       if (!detailed && !selected && !hovered) {
-        // Overview: compact icon globito with count badge for multi-experience venues.
+        // Overview (all zoom-out levels): always-visible compact bubble for every venue/event.
         el.innerHTML = `
           <span class="qhba-pin-inner" style="display:flex;flex-direction:column;align-items:center">
-            <span style="display:flex;align-items:center;gap:4px;height:26px;padding:0 ${n > 1 || free ? "8px" : "6px"};border-radius:999px;background:#111113;border:1.5px solid ${cat.color};color:#ededef;box-shadow:0 6px 16px -4px rgba(0,0,0,.85);font:600 11px var(--ff-mono),monospace">
+            <span style="display:flex;align-items:center;gap:3.5px;height:26px;padding:0 ${n > 1 || free ? "8px" : "6px"};border-radius:999px;background:#111113;border:1.5px solid ${cat.color};color:#f4f4f6;box-shadow:0 5px 14px -3px rgba(0,0,0,.85);font:600 10.5px var(--ff-mono),monospace">
               <span style="font-size:12px;line-height:1">${cat.emoji}</span>
               ${n > 1 ? `<span>×${n}</span>` : ""}
-              ${free && n === 1 ? `<span style="font-size:9.5px;color:#34d399">$0</span>` : ""}
+              ${free && n === 1 ? `<span style="font-size:9px;color:#34d399">$0</span>` : ""}
             </span>
-            <span style="width:2px;height:4px;background:${cat.color}"></span>
+            <span style="width:2px;height:3.5px;background:${cat.color}"></span>
           </span>`;
       } else {
+        // Zoomed-in (or selected/hovered): bubble with full text title / venue name.
         const bg = selected ? "#f5b84a" : "#111113";
-        const fg = selected ? "#09090b" : "#ededef";
-        const border = selected ? "#f5b84a" : hovered ? "#ededef" : `${cat.color}99`;
-        const label = n > 1 ? clip(g.venueName, 20) : clip(first.title, 22);
+        const fg = selected ? "#09090b" : "#f4f4f6";
+        const border = selected ? "#f5b84a" : hovered ? "#f4f4f6" : `${cat.color}99`;
+        const label = n > 1 ? g.venueName : first.title;
+        const priceBadge = free
+          ? `<span style="font:600 10px var(--ff-mono),monospace;color:${selected ? "#065f46" : "#34d399"}">$0</span>`
+          : n === 1 && first.priceMin != null && first.priceMin > 0
+            ? `<span style="font:600 10px var(--ff-mono),monospace;color:${selected ? "#09090b" : "#f5b84a"}">$${Math.round(first.priceMin / 1000)}k</span>`
+            : "";
         el.innerHTML = `
           <span class="qhba-pin-inner" style="display:flex;flex-direction:column;align-items:center;transform:${hovered && !selected ? "translateY(-2px)" : "none"};transition:transform .15s">
             <span style="display:flex;align-items:center;gap:6px;padding:4px 10px 4px 5px;border-radius:999px;background:${bg};color:${fg};border:1.5px solid ${border};box-shadow:0 10px 24px -6px rgba(0,0,0,.85);white-space:nowrap;font:600 11.5px var(--ff-sans),sans-serif;letter-spacing:-.01em">
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:${selected ? "#09090b22" : `${cat.color}26`};font-size:11.5px;line-height:1">${cat.emoji}</span>
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:999px;background:${selected ? "#09090b22" : `${cat.color}26`};font-size:11.5px;line-height:1;flex-shrink:0">${cat.emoji}</span>
               <span>${esc(label)}</span>
               ${n > 1 ? `<span style="padding:1px 5px;border-radius:999px;background:${selected ? "#09090b1f" : "rgba(255,255,255,.09)"};font:600 10px var(--ff-mono),monospace">×${n}</span>` : ""}
-              ${free ? `<span style="font:600 10px var(--ff-mono),monospace;color:${selected ? "#065f46" : "#34d399"}">$0</span>` : ""}
+              ${priceBadge}
             </span>
             <span style="width:1.5px;height:6px;background:${border}"></span>
             <span style="width:5px;height:5px;border-radius:999px;background:${cat.color}"></span>
@@ -328,9 +308,9 @@ export function MapView({
         new Marker({ element: el, anchor: "bottom" }).setLngLat([g.lng, g.lat]).addTo(map)
       );
     }
-  }, [groups, tick, selectedId, hoveredId]);
+  }, [groups, detailed, selectedId, hoveredId]);
 
-  // Popover listing every event at one venue.
+  // Stack popover listing every experience at one venue.
   useEffect(() => {
     stackRef.current?.remove();
     stackRef.current = null;
@@ -359,17 +339,12 @@ export function MapView({
           </span>
         </span>`;
       row.addEventListener("mouseenter", () => (row.style.background = "rgba(255,255,255,.05)"));
-      row.addEventListener(
-        "mouseleave",
-        () => (row.style.background = ev.id === selectedId ? "rgba(245,184,74,.14)" : "transparent")
-      );
+      row.addEventListener("mouseleave", () => (row.style.background = ev.id === selectedId ? "rgba(245,184,74,.14)" : "transparent"));
       row.addEventListener("click", () => onSelectRef.current(ev));
       box.appendChild(row);
     }
 
-    stackRef.current = new Marker({ element: box, anchor: "bottom" })
-      .setLngLat([g.lng, g.lat])
-      .addTo(map);
+    stackRef.current = new Marker({ element: box, anchor: "bottom" }).setLngLat([g.lng, g.lat]).addTo(map);
   }, [openStack, groups, selectedId]);
 
   useEffect(() => {
@@ -404,9 +379,7 @@ export function MapView({
       const el = document.createElement("div");
       el.style.cssText =
         "width:14px;height:14px;border-radius:999px;background:#38bdf8;border:2px solid #09090b;box-shadow:0 0 0 6px rgba(56,189,248,.22)";
-      userMarkerRef.current = new Marker({ element: el })
-        .setLngLat([userLocation.lng, userLocation.lat])
-        .addTo(map);
+      userMarkerRef.current = new Marker({ element: el }).setLngLat([userLocation.lng, userLocation.lat]).addTo(map);
     } else {
       userMarkerRef.current.setLngLat([userLocation.lng, userLocation.lat]);
     }

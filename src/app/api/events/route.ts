@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
   const price = sp.get("price") ?? "";
   const catParam = sp.get("cat") ?? "";
   const when = sp.get("when") ?? "";
-  const q = (sp.get("q") ?? "").trim().slice(0, 80);
+  const q = (sp.get("q") ?? "").trim();
 
   await ensureFreshEvents();
 
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
           : db``
       }
     order by e.group_key, e.starts_at asc
-    limit 1200
+    limit 2500
   `;
 
   // Sort chronologically by starts_at for the sidebar / list order.

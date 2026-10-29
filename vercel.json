@@ -1,8 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/cron/gcba", "schedule": "0 8 * * *" },
-    { "path": "/api/cron/eventbrite", "schedule": "20 8 * * *" },
-    { "path": "/api/cron/alternativa", "schedule": "40 8 * * *" }
+    { "path": "/api/cron/gcba", "schedule": "0 */4 * * *" },
+    { "path": "/api/cron/eventbrite", "schedule": "15 */4 * * *" },
+    { "path": "/api/cron/alternativa", "schedule": "30 */4 * * *" },
+    { "path": "/api/cron/livepass", "schedule": "45 */4 * * *" },
+    { "path": "/api/cron/cultura_nacion", "schedule": "50 */4 * * *" },
+    { "path": "/api/cron/recoleta", "schedule": "55 */4 * * *" }
   ]
 }

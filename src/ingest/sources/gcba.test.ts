@@ -1,24 +1,28 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { gcbaEventUrl } from "./gcba";
+import { describe, it } from "node:test";
+import { buildGcbaUrl } from "./gcba";
 
-const BASE = "https://linda.buenosaires.gob.ar";
+describe("buildGcbaUrl", () => {
+  it("rewrites the retired /descubrir pathAlias to /eventos", () => {
+    assert.equal(
+      buildGcbaUrl({ pathAlias: "/descubrir/congreso-de-informatica", slug: "congreso-de-informatica" }),
+      "https://linda.buenosaires.gob.ar/eventos/congreso-de-informatica"
+    );
+  });
 
-test("rewrites the retired /descubrir/ route to /eventos/", () => {
-  assert.equal(gcbaEventUrl("/descubrir/noche-de-museos", null), `${BASE}/eventos/noche-de-museos`);
-});
+  it("builds /eventos/<slug> when pathAlias is missing", () => {
+    assert.equal(
+      buildGcbaUrl({ pathAlias: null, slug: "jazz-en-parque" }),
+      "https://linda.buenosaires.gob.ar/eventos/jazz-en-parque"
+    );
+  });
 
-test("builds the slug route when the API only returns a slug", () => {
-  assert.equal(gcbaEventUrl(null, "feria-de-libro"), `${BASE}/eventos/feria-de-libro`);
-});
+  it("keeps absolute external links untouched", () => {
+    assert.equal(buildGcbaUrl({ pathAlias: "https://otro.sitio/x", slug: "x" }), "https://otro.sitio/x");
+  });
 
-test("keeps absolute links untouched", () => {
-  assert.equal(
-    gcbaEventUrl("https://example.com/evento/42", null),
-    "https://example.com/evento/42"
-  );
-});
-
-test("falls back to the agenda index", () => {
-  assert.equal(gcbaEventUrl(null, null), `${BASE}/agenda`);
+  it("falls back to /agenda without a usable slug", () => {
+    assert.equal(buildGcbaUrl({ pathAlias: "/descubrir", slug: null }), "https://linda.buenosaires.gob.ar/agenda");
+    assert.equal(buildGcbaUrl({ pathAlias: null, slug: null }), "https://linda.buenosaires.gob.ar/agenda");
+  });
 });

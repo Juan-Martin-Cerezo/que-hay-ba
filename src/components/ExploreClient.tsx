@@ -16,8 +16,9 @@ type SortMode = "upcoming" | "free" | "nearest";
 type Sheet = "peek" | "half" | "full";
 
 // Mobile bottom-sheet heights. Desktop ignores these (panel is a full-height column).
-const SHEET_HEIGHT: Record<Sheet, string> = { peek: "168px", half: "52dvh", full: "82dvh" };
+const SHEET_HEIGHT: Record<Sheet, string> = { peek: "196px", half: "54dvh", full: "86dvh" };
 const NEXT_SHEET: Record<Sheet, Sheet> = { peek: "half", half: "full", full: "peek" };
+const SHEET_LABEL: Record<Sheet, string> = { peek: "Lista", half: "Ampliar", full: "Mapa" };
 
 export function ExploreClient() {
   const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS);
@@ -26,7 +27,6 @@ export function ExploreClient() {
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<string>("en vivo");
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<MapEventProperties | null>(null);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [favoritesOpen, setFavoritesOpen] = useState(false);
@@ -36,12 +36,7 @@ export function ExploreClient() {
   const [mapTheme, setMapTheme] = useState<MapThemeId>("dark");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
-  const [flyTarget, setFlyTarget] = useState<{
-    lat: number;
-    lng: number;
-    zoom?: number;
-    ts: number;
-  } | null>(null);
+  const [flyTarget, setFlyTarget] = useState<{ lat: number; lng: number; zoom?: number; ts: number } | null>(null);
 
   const { favorites, isFavorite, toggleFavorite } = useFavorites();
 
@@ -77,14 +72,10 @@ export function ExploreClient() {
   useEffect(() => {
     const ctrl = new AbortController();
     fetch(`/api/events?${queryString}`, { signal: ctrl.signal, cache: "no-store" })
-      .then((r) => {
-        if (!r.ok) throw new Error(`El servidor respondió ${r.status}`);
-        return r.json();
-      })
+      .then((r) => r.json())
       .then((d: EventsGeoJSON) => {
         if (!ctrl.signal.aborted && d?.features) {
           setData(d);
-          setLoadError(null);
           setLoadedKey(queryString);
           const now = new Date();
           setLastUpdated(
@@ -92,10 +83,8 @@ export function ExploreClient() {
           );
         }
       })
-      .catch((err: unknown) => {
-        if (ctrl.signal.aborted) return;
-        setLoadError(err instanceof Error ? err.message : "No se pudo cargar la cartelera");
-        setLoadedKey(queryString);
+      .catch(() => {
+        if (!ctrl.signal.aborted) setLoadedKey(queryString);
       });
     return () => ctrl.abort();
   }, [queryString, refreshTick]);
@@ -130,13 +119,11 @@ export function ExploreClient() {
   const events = useMemo(() => {
     const list = data.features.map((f) => f.properties);
     if (sortMode === "nearest" && userLocation) {
-      const d = (e: MapEventProperties) =>
-        distanceKm(userLocation.lat, userLocation.lng, e.lat, e.lng);
-      return [...list].sort((a, b) => d(a) - d(b)).slice(0, 120);
+      const d = (e: MapEventProperties) => distanceKm(userLocation.lat, userLocation.lng, e.lat, e.lng);
+      return [...list].sort((a, b) => d(a) - d(b)).slice(0, 300);
     }
-    if (sortMode === "free")
-      return [...list].sort((a, b) => Number(b.isFree) - Number(a.isFree)).slice(0, 120);
-    return list.slice(0, 120);
+    if (sortMode === "free") return [...list].sort((a, b) => Number(b.isFree) - Number(a.isFree)).slice(0, 300);
+    return list.slice(0, 300);
   }, [data.features, sortMode, userLocation]);
 
   const siblings = useMemo(() => {
@@ -168,12 +155,12 @@ export function ExploreClient() {
   const themeLabel = MAP_THEMES.find((t) => t.id === mapTheme)?.label ?? "";
 
   const sortHeader = (
-    <div className="flex shrink-0 items-center justify-between border-y border-line px-4 py-2 text-xs">
-      <div className="flex items-center gap-4">
+    <div className="flex shrink-0 items-center justify-between border-y border-line px-4 py-1.5 text-xs">
+      <div className="flex items-center gap-1">
         {(
           [
             ["upcoming", "Próximos"],
-            ["free", "Gratis primero"],
+            ["free", "Gratis"],
             ...(userLocation ? ([["nearest", "Cerca"]] as const) : []),
           ] as const
         ).map(([id, label]) => (
@@ -181,50 +168,52 @@ export function ExploreClient() {
             key={id}
             type="button"
             onClick={() => setSortMode(id)}
-            className={`relative py-0.5 font-medium transition-colors ${
-              sortMode === id ? "text-accent" : "text-muted hover:text-fg"
+            className={`min-h-9 cursor-pointer rounded-lg px-2.5 py-1 font-medium transition-colors ${
+              sortMode === id ? "bg-accent/15 text-accent" : "text-muted hover:text-fg"
             }`}
           >
             {label}
           </button>
         ))}
       </div>
-      <span className="flex items-center gap-1.5 font-mono text-[10.5px] text-muted">
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            loadError ? "bg-amber-400" : "bg-emerald-400 animate-pulse"
-          }`}
-        />
-        {loading
-          ? "Sincronizando…"
-          : loadError
-            ? "Sin datos del servidor · reintentando"
-            : `${data.total.toLocaleString("es-AR")} · ${lastUpdated}`}
+      <span className="flex items-center gap-1.5 font-mono text-[11px] text-muted">
+        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        {loading ? "Sincronizando…" : `${data.total.toLocaleString("es-AR")} · ${lastUpdated}`}
       </span>
     </div>
   );
 
   const renderEventRows = () => (
-    <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto overscroll-contain pb-[env(safe-area-inset-bottom)]">
-      {events.length === 0 && !loading ? (
+    <ul className="min-h-0 flex-1 divide-y divide-line overflow-y-auto overscroll-contain pb-[max(1rem,env(safe-area-inset-bottom))]">
+      {events.length === 0 && loading ? (
+        Array.from({ length: 5 }).map((_, i) => (
+          <li key={i} className="flex items-start gap-3 px-4 py-3.5 animate-pulse">
+            <span className="h-9 w-9 shrink-0 rounded-full bg-raised" />
+            <span className="flex-1 space-y-2 py-0.5">
+              <span className="block h-3.5 w-3/4 rounded bg-raised" />
+              <span className="block h-3 w-1/2 rounded bg-raised/70" />
+              <span className="block h-2.5 w-1/3 rounded bg-raised/50" />
+            </span>
+          </li>
+        ))
+      ) : events.length === 0 ? (
         <li className="px-6 py-12 text-center">
           <p className="font-display text-xl">Nada por acá.</p>
-          <p className="mt-1 text-xs text-muted">Probá con menos filtros.</p>
+          <p className="mt-1 text-xs text-muted">Probá con menos filtros o cambiá de barrio.</p>
           <button
             type="button"
             onClick={() => setFilters(EMPTY_FILTERS)}
-            className="mt-4 rounded-full bg-fg px-4 py-2 text-xs font-semibold text-ink"
+            className="mt-4 min-h-11 cursor-pointer rounded-full bg-fg px-5 py-2.5 text-xs font-semibold text-ink"
           >
-            Ver todo
+            Ver toda la cartelera
           </button>
         </li>
       ) : (
         events.map((ev) => {
           const cat = categoryById[ev.category] ?? categoryById.arte;
-          const dist = userLocation
-            ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng)
-            : null;
+          const dist = userLocation ? distanceKm(userLocation.lat, userLocation.lng, ev.lat, ev.lng) : null;
           const on = selected?.id === ev.id;
+          const hasNumericPrice = ev.priceMin != null && ev.priceMin > 0;
           return (
             <li key={ev.id}>
               <button
@@ -232,37 +221,39 @@ export function ExploreClient() {
                 onMouseEnter={() => setHoveredId(ev.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 onClick={() => selectEvent(ev)}
-                className={`group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${
-                  on ? "bg-accent/12" : "hover:bg-white/[0.03]"
+                className={`group flex w-full cursor-pointer items-start gap-3 px-4 py-3.5 text-left transition-colors active:bg-white/[0.06] ${
+                  on ? "bg-accent/14" : "hover:bg-white/[0.03]"
                 }`}
               >
                 <span
-                  className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs"
+                  className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-sm"
                   style={{
-                    background: `${cat.color}1f`,
-                    borderColor: `${cat.color}55`,
+                    background: `${cat.color}22`,
+                    borderColor: `${cat.color}66`,
                   }}
                 >
                   {cat.emoji}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span
-                    className={`line-clamp-1 text-sm font-medium leading-snug ${on ? "text-accent" : "text-fg"}`}
-                  >
+                  <span className={`line-clamp-1 text-[14.5px] font-medium leading-snug ${on ? "text-accent" : "text-fg"}`}>
                     {ev.title}
                   </span>
                   <span className="mt-0.5 block truncate text-xs text-muted">
                     {ev.venueName}
                     {ev.barrio ? ` · ${ev.barrio}` : ""}
                   </span>
-                  <span className="mt-1 flex items-center justify-between gap-2 font-mono text-[11px]">
+                  <span className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[11px]">
                     <span className="truncate text-muted">
                       {formatEventDate(ev.startsAt)}
                       {dist != null ? ` · ${dist.toFixed(1)} km` : ""}
                     </span>
                     <span
-                      className={`shrink-0 rounded-full px-1.5 py-0.2 text-[10.5px] font-semibold ${
-                        ev.isFree ? "bg-emerald-400/15 text-emerald-400" : "text-fg/80"
+                      className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${
+                        ev.isFree
+                          ? "bg-emerald-400/15 text-emerald-400"
+                          : hasNumericPrice
+                            ? "bg-accent/15 text-accent"
+                            : "text-muted"
                       }`}
                     >
                       {ev.priceLabel}
@@ -275,7 +266,7 @@ export function ExploreClient() {
         })
       )}
       <li className="px-4 py-4 text-center">
-        <Link href="/acerca" className="font-mono text-[11px] text-muted hover:text-fg">
+        <Link href="/acerca" className="inline-flex min-h-10 items-center px-3 font-mono text-xs text-muted hover:text-fg">
           Fuentes y metodología →
         </Link>
       </li>
@@ -297,26 +288,14 @@ export function ExploreClient() {
       {/* Floating map tools — top right on desktop, bottom-right above sheet on mobile */}
       <div className="pointer-events-none absolute right-3 top-3 z-10 hidden gap-2 md:flex">
         <ToolButton onClick={cycleTheme} label={`Mapa: ${themeLabel}`}>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className="h-4 w-4"
-          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4">
             <path d="m12 3 9 5-9 5-9-5 9-5Z" />
             <path d="m3 13 9 5 9-5" />
           </svg>
           <span>{themeLabel}</span>
         </ToolButton>
         <ToolButton onClick={locate} label="Mi ubicación" active={Boolean(userLocation)}>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}
-          >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}>
             <circle cx="12" cy="12" r="3" />
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
           </svg>
@@ -330,16 +309,17 @@ export function ExploreClient() {
             <h1 className="font-display text-xl leading-none tracking-tight">
               Qué hay <em className="text-accent">BA</em>
             </h1>
-            <span className="flex items-center gap-1 font-mono text-[10px] text-emerald-400">
+            <span className="flex items-center gap-1 font-mono text-[10.5px] text-emerald-400">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {data.total.toLocaleString("es-AR")}
+              {data.total}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={cycleTheme}
-              className="flex h-7 items-center gap-1 rounded-full border border-line bg-raised px-2.5 text-[11px] text-muted hover:text-fg"
+              aria-label={`Cambiar mapa (${themeLabel})`}
+              className="flex h-10 cursor-pointer items-center gap-1 rounded-full border border-line bg-raised px-3 text-xs font-medium text-muted active:scale-95 hover:text-fg"
             >
               {themeLabel}
             </button>
@@ -347,19 +327,11 @@ export function ExploreClient() {
               type="button"
               onClick={locate}
               aria-label="Mi ubicación"
-              className={`flex h-7 w-7 items-center justify-center rounded-full border ${
-                userLocation
-                  ? "border-sky-400/60 bg-sky-400/15 text-sky-300"
-                  : "border-line bg-raised text-muted"
+              className={`flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border active:scale-95 ${
+                userLocation ? "border-sky-400/60 bg-sky-400/15 text-sky-300" : "border-line bg-raised text-muted"
               }`}
             >
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-3.5 w-3.5"
-              >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${locating ? "animate-spin" : ""}`}>
                 <circle cx="12" cy="12" r="3" />
                 <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
               </svg>
@@ -367,7 +339,8 @@ export function ExploreClient() {
             <button
               type="button"
               onClick={() => setFavoritesOpen(true)}
-              className="flex h-7 items-center gap-1 rounded-full border border-line bg-raised px-2.5 font-mono text-[11px] text-muted"
+              aria-label="Ver guardados"
+              className="flex h-10 min-w-10 cursor-pointer items-center justify-center gap-1 rounded-full border border-line bg-raised px-3 font-mono text-xs text-muted active:scale-95"
             >
               ★ {favorites.length}
             </button>
@@ -376,6 +349,7 @@ export function ExploreClient() {
         <FilterBar
           filters={filters}
           activeZone={activeZone}
+          compact
           onChange={setFilters}
           onSelectZone={selectZone}
         />
@@ -390,10 +364,16 @@ export function ExploreClient() {
         <button
           type="button"
           onClick={() => setSheet((s) => NEXT_SHEET[s])}
-          aria-label={sheet === "full" ? "Contraer listado" : "Expandir listado"}
-          className="flex w-full shrink-0 items-center justify-center gap-2 py-2"
+          aria-label={sheet === "full" ? "Volver al mapa" : "Expandir listado de actividades"}
+          className="flex min-h-11 w-full shrink-0 cursor-pointer items-center justify-between px-4 py-2 text-xs text-muted active:bg-white/[0.03]"
         >
-          <span className="h-1 w-9 rounded-full bg-white/25" />
+          <span className="font-mono text-[11px] uppercase tracking-wider text-fg/80">
+            {events.length} en vista
+          </span>
+          <span className="h-1.5 w-10 rounded-full bg-white/30" />
+          <span className="font-mono text-[11px] font-semibold text-accent">
+            {SHEET_LABEL[sheet]} ↕
+          </span>
         </button>
         {sortHeader}
         {renderEventRows()}
@@ -402,7 +382,7 @@ export function ExploreClient() {
       {/* DESKTOP & TABLET (≥ 768px): Fixed Left Column Sidebar */}
       <aside
         aria-label="Explorar actividades"
-        className="hidden md:fixed md:bottom-3 md:left-3 md:top-3 md:z-20 md:flex md:w-[392px] md:flex-col md:overflow-hidden md:rounded-3xl md:border md:border-line md:bg-panel/95 md:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.85)] md:backdrop-blur-xl lg:w-[408px]"
+        className="hidden md:fixed md:bottom-3 md:left-3 md:top-3 md:z-20 md:flex md:w-[364px] md:flex-col md:overflow-hidden md:rounded-3xl md:border md:border-line md:bg-panel/95 md:shadow-[0_24px_60px_-15px_rgba(0,0,0,0.85)] md:backdrop-blur-xl lg:w-[408px]"
       >
         <header className="shrink-0 space-y-3 p-4 pb-3">
           <div className="flex items-center justify-between gap-3">
@@ -420,15 +400,9 @@ export function ExploreClient() {
                 onClick={() => setRefreshTick((t) => t + 1)}
                 title="Actualizar cartelera ahora"
                 aria-label="Actualizar cartelera ahora"
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-white/20 hover:text-fg"
+                className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full border border-line text-muted transition-colors hover:border-white/20 hover:text-fg"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className={`h-3.5 w-3.5 ${loading ? "animate-spin text-accent" : ""}`}
-                >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={`h-4 w-4 ${loading ? "animate-spin text-accent" : ""}`}>
                   <path d="M21 12a9 9 0 1 1-2.64-6.36" />
                   <path d="M21 3v6h-6" />
                 </svg>
@@ -436,15 +410,9 @@ export function ExploreClient() {
               <button
                 type="button"
                 onClick={() => setFavoritesOpen(true)}
-                className="flex h-8 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-medium text-muted transition-colors hover:border-white/20 hover:text-fg"
+                className="flex h-10 cursor-pointer items-center gap-1.5 rounded-full border border-line px-3.5 text-xs font-medium text-muted transition-colors hover:border-white/20 hover:text-fg"
               >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill={favorites.length ? "#f5b84a" : "none"}
-                  stroke={favorites.length ? "#f5b84a" : "currentColor"}
-                  strokeWidth="1.8"
-                  className="h-3.5 w-3.5"
-                >
+                <svg viewBox="0 0 24 24" fill={favorites.length ? "#f5b84a" : "none"} stroke={favorites.length ? "#f5b84a" : "currentColor"} strokeWidth="1.8" className="h-4 w-4">
                   <path d="M6 3h12v18l-6-4-6 4V3Z" />
                 </svg>
                 <span className="font-mono">{favorites.length}</span>
@@ -503,9 +471,7 @@ function ToolButton({
       aria-label={label}
       title={label}
       className={`pointer-events-auto flex h-10 min-w-10 items-center justify-center gap-2 rounded-full border px-3.5 text-xs font-medium shadow-[0_8px_24px_-8px_rgba(0,0,0,0.85)] backdrop-blur-xl transition-colors ${
-        active
-          ? "border-sky-400/60 bg-sky-400/15 text-sky-300"
-          : "border-line bg-panel/95 text-fg hover:bg-raised"
+        active ? "border-sky-400/60 bg-sky-400/15 text-sky-300" : "border-line bg-panel/95 text-fg hover:bg-raised"
       }`}
     >
       {children}
